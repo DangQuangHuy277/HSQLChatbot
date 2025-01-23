@@ -1,0 +1,23 @@
+-- Insert data into the `program` table
+INSERT INTO program (code, name, degree_type, training_duration, abbreviation)
+VALUES ('CN1', 'Công nghệ thông tin', 'Cử nhân', 4.0, 'I-IT'),
+       ('CN2', 'Kỹ thuật máy tính', 'Kỹ sư', 4.5, 'E-CE'),
+       ('CN3', 'Vật lý kỹ thuật', 'Cử nhân', 4.0, 'P-EP'),
+       ('CN4', 'Cơ kỹ thuật', 'Kỹ sư', 4.5, 'M-EM'),
+       ('CN5', 'Công nghệ kỹ thuật xây dựng', 'Kỹ sư', 4.5, 'C-CE'),
+       ('CN6', 'Công nghệ kỹ thuật cơ điện tử', 'Cử nhân', 4, 'M-MT'),
+       ('CN7', 'Công nghệ Hàng không vũ trụ', 'Kỹ sư', 4.5, 'S-AE'),
+       ('CN8', 'Khoa học máy tính', 'Cử nhân', 4, 'I-CS'),
+       ('CN9', 'Công nghệ kỹ thuật điện tử - viễn thông', 'Cử nhân', 4.0, 'E-EC'),
+       ('CN10', 'Công nghệ nông nghiệp', 'Kỹ sư', 4.5, 'G-AT'),
+       ('CN11', 'Kỹ thuật điều khiển và tự động hóa', 'Kỹ sư', 4.5, 'M-AT'),
+       ('CN12', 'Trí tuệ nhân tạo', 'Cử nhân', 4.0, 'A-AI'),
+       ('CN13', 'Kỹ thuật năng lượng', 'Kỹ sư', 4.5, 'P-EE'),
+       ('CN14', 'Hệ thống thông tin', 'Cử nhân', 4.0, 'I-IS'),
+       ('CN15', 'Mạng máy tính và truyền thông dữ liệu', 'Kỹ sư', 4.5, 'I-CN'),
+       ('CN16', 'Công nghệ thông tin Định hướng thị trường Nhật Bản', 'Cử nhân', 4.0, NULL),
+       ('CN17', 'Kỹ thuật Robot', 'Kỹ sư', 4.5, 'E-RE'),
+       ('CN18', 'Thiết kế công nghiệp và đồ họa', 'Cử nhân', 4.0, 'C-ID'),
+       ('CN19', 'Công nghệ vật liệu', 'Kỹ sư', 4.5, 'M-MT'),
+       ('CN20', 'Khoa học dữ liệu', 'Cử nhân', 4.0, NULL),
+       ('CN21', 'Công nghệ sinh học', 'Kỹ sư', 4.5, NULL);

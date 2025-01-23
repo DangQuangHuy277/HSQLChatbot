@@ -15,7 +15,7 @@ func init() {
 func (d *PgDDLLoader) LoadDDL(db *sql.DB) (string, error) {
 	// At this time, we will load the DDL from the init file
 	// TODO: Load from the running database instead
-	content, err := os.ReadFile("/home/huy/GolandProjects/HNLP/db/init/schema.sql")
+	content, err := os.ReadFile("/home/huy/GolandProjects/HNLP/db/init/1-schema.sql")
 	if err != nil {
 		return "", err
 	}
