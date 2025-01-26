@@ -1,19 +1,23 @@
 \c university;
 
-CREATE TABLE IF NOT EXISTS department
+CREATE TABLE IF NOT EXISTS faculty
 (
     id   SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
+    name VARCHAR(100) NOT NULL UNIQUE,
+    type VARCHAR(50)
 );
 
 CREATE TABLE IF NOT EXISTS professor
 (
-    id            SERIAL PRIMARY KEY,
-    name          VARCHAR(100),
-    email         VARCHAR(100),
-    department_id INT
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(100) NOT NULL UNIQUE,
+    email           VARCHAR(100),
+    academic_rank   VARCHAR(50), -- Học hàm (e.g., Professor)
+    degree          VARCHAR(50), -- Học vị (e.g., PhD)
+    department_id   INT
 --     FOREIGN KEY (department_id) REFERENCES department (id)
 );
+
 
 CREATE TABLE IF NOT EXISTS program
 (
@@ -25,7 +29,6 @@ CREATE TABLE IF NOT EXISTS program
     abbreviation      VARCHAR(10)                  -- Tên viết tắt
 
 );
-
 
 
 CREATE TABLE IF NOT EXISTS administrative_class
@@ -47,8 +50,9 @@ CREATE TABLE IF NOT EXISTS semester
 CREATE TABLE IF NOT EXISTS course
 (
     id               SERIAL PRIMARY KEY,
-    code             VARCHAR(10),   -- Course code, e.g., 'CS101'
+    code             VARCHAR(10) NOT NULL UNIQUE,   -- Course code, e.g., 'CS101'
     name             VARCHAR(100),  -- Course name, e.g., 'Introduction to Programming'
+    english_name     VARCHAR(100),  -- English name of the course
     credits          INT,           -- Credit hours for the course
     program_id       INT,           -- Foreign key to the related program
     practice_hours   INT DEFAULT 0, -- Hours dedicated to practice sessions
