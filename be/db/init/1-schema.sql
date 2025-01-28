@@ -9,12 +9,12 @@ CREATE TABLE IF NOT EXISTS faculty
 
 CREATE TABLE IF NOT EXISTS professor
 (
-    id              SERIAL PRIMARY KEY,
-    name            VARCHAR(100) NOT NULL UNIQUE,
-    email           VARCHAR(100),
-    academic_rank   VARCHAR(50), -- Học hàm (e.g., Professor)
-    degree          VARCHAR(50), -- Học vị (e.g., PhD)
-    department_id   INT
+    id            SERIAL PRIMARY KEY,
+    name          VARCHAR(100) NOT NULL UNIQUE,
+    email         VARCHAR(100),
+    academic_rank VARCHAR(50), -- Học hàm (e.g., Professor)
+    degree        VARCHAR(50), -- Học vị (e.g., PhD)
+    department_id INT
 --     FOREIGN KEY (department_id) REFERENCES department (id)
 );
 
@@ -50,15 +50,26 @@ CREATE TABLE IF NOT EXISTS semester
 CREATE TABLE IF NOT EXISTS course
 (
     id               SERIAL PRIMARY KEY,
-    code             VARCHAR(10) NOT NULL UNIQUE,   -- Course code, e.g., 'CS101'
-    name             VARCHAR(100),  -- Course name, e.g., 'Introduction to Programming'
-    english_name     VARCHAR(100),  -- English name of the course
-    credits          INT,           -- Credit hours for the course
-    program_id       INT,           -- Foreign key to the related program
-    practice_hours   INT DEFAULT 0, -- Hours dedicated to practice sessions
-    theory_hours     INT DEFAULT 0, -- Hours dedicated to theory sessions
-    self_learn_hours INT DEFAULT 0  -- Hours dedicated to self-study
+    code             VARCHAR(10) NOT NULL UNIQUE, -- Course code, e.g., 'CS101'
+    name             VARCHAR(100),                -- Course name, e.g., 'Introduction to Programming'
+    english_name     VARCHAR(100),                -- English name of the course
+    credits          INT,                         -- Credit hours for the course
+    practice_hours   INT DEFAULT 0,               -- Hours dedicated to practice sessions
+    theory_hours     INT DEFAULT 0,               -- Hours dedicated to theory sessions
+    self_learn_hours INT DEFAULT 0,               -- Hours dedicated to self-study
+    prerequisite     INT                          -- Foreign key to the prerequisite course
 );
+
+
+CREATE TABLE IF NOT EXISTS course_program -- Junction table for many-to-many relationship between course and program
+(
+    course_id  INT NOT NULL,            -- Foreign key to the course
+    program_id INT NOT NULL,            -- Foreign key to the program
+    PRIMARY KEY (course_id, program_id) -- Composite primary key
+--     FOREIGN KEY (course_id) REFERENCES course(id),
+--     FOREIGN KEY (program_id) REFERENCES program(id)
+);
+
 
 CREATE TABLE IF NOT EXISTS course_class
 (
