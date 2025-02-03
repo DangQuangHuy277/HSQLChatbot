@@ -80,7 +80,7 @@ def scrape_uet_staff():
             if not row.find('td').text.isdigit():
                 continue
 
-            academic_rank, degree, name = extract_academic_rank_and_degree_regex(row.find_all('td')[1].text)
+            academic_rank, degree, name = extract_academic_rank_and_degree(row.find_all('td')[1].text)
             professor_data = {
                 "name": name,
                 "academic_rank": academic_rank,
@@ -100,7 +100,7 @@ def extract_faculty_type(faculty_name):
     return None  # Return None if no match is foun
 
 
-def extract_academic_rank_and_degree_regex(full_name):
+def extract_academic_rank_and_degree(full_name):
     # Define regex to capture academic rank, degree, and name
     pattern = r"^(?:(GS|PGS)\.?)?\s?(?:(TSKH|TS|ThS)\.?)?\s?(.*)$"
     match = re.match(pattern, full_name)

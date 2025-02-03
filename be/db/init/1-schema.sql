@@ -75,23 +75,33 @@ CREATE TABLE IF NOT EXISTS course_class
 (
     id           SERIAL PRIMARY KEY,
     code         VARCHAR(10),
-    course_id    INT,
-    semester_id  INT,
-    professor_id INT
---     FOREIGN KEY (course_id) REFERENCES course (id),
---     FOREIGN KEY (semester_id) REFERENCES semester (id),
---     FOREIGN KEY (professor_id) REFERENCES professor (id)
+    course_id    INT NOT NULL,
+    semester_id  VARCHAR(11) NOT NULL,
+    professor_id INT NOT NULL,
+    suggested_class VARCHAR(20),
+    UNIQUE (code, semester_id)
+-- FOREIGN KEY (course_id) REFERENCES course (id),
+-- FOREIGN KEY (professor_id) REFERENCES professor (id)
 );
+
 
 CREATE TABLE IF NOT EXISTS course_class_schedule
 (
-    id              SERIAL PRIMARY KEY,
-    course_class_id INT,         -- Foreign key to course_class
-    day_of_week     VARCHAR(20), -- Day of the week, e.g., 'Monday', 'Tuesday'
-    start_period    INT,         -- Start period, e.g., 2 (for period 2)
-    end_period      INT,         -- End period, e.g., 5 (for period 5)
-    location        VARCHAR(50)  -- Location, e.g., 'Room P108'
---     FOREIGN KEY (course_class_id) REFERENCES course_class (id)
+    id               SERIAL PRIMARY KEY,
+    course_class_id  INT         NOT NULL,
+    day_of_week      VARCHAR(10) NOT NULL, -- e.g. '2' for Monday or use full names if preferred
+    lesson_range     VARCHAR(10), -- e.g. '3-4' or '7-8' or '9-10'
+    session_type     VARCHAR(20), -- e.g. 'theory' or 'practice'
+    group_identifier VARCHAR(20),          -- e.g. 'CL' for theory, '1', '2' for practice sessions
+    location         VARCHAR(50) NOT NULL -- e.g. '208-GĐ3', '214-GĐ3'
+--     CONSTRAINT fk_course_class FOREIGN KEY (course_class_id)
+--         REFERENCES course_class (id),
+--     CONSTRAINT chk_session_group
+--         CHECK (
+--             (session_type = 'theory' AND (group_identifier = 'CL' OR group_identifier IS NULL))
+--                 OR
+--             (session_type = 'practice' AND group_identifier IS NOT NULL)
+--             )
 );
 
 CREATE TABLE IF NOT EXISTS program_semester_fee

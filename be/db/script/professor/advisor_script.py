@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 import pdfplumber
 import requests
@@ -121,6 +122,42 @@ def scrape_advisors_for_year(school_year, base_url):
 
     save_advisor_data(class_data)
 
+@lru_cache(maxsize=1)
+def get_class_maps(pdf_file_path):
+    in_class_map = {}
+    in_k_class_map = {}
+
+    with pdfplumber.open(pdf_file_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+            lines = text.split('\n')
+            for line in lines:
+                parts = line.split()
+                # Only process lines that start with a digit.
+                if not parts or not parts[0].isdigit():
+                    continue
+                # Assuming the structure: index, original_class_code, conversion_value, ...
+                # Adjust indexes if your PDF structure is different.
+                in_class_map[parts[1]] = parts[2]
+
+    for key in in_class_map:
+        # Extract the year from positions 3 to 7 in the key and compute k.
+        try:
+            year = int(key[3:7])
+            k = year - 1955
+        except (ValueError, IndexError):
+            # Skip this entry if it doesn't meet the expected format.
+            continue
+
+        # Build the suffix from characters starting at index 13,
+        # removing any '-' characters.
+        class_name_suffix = ''.join(key[13:].split('-'))
+        new_key = f'K{k}{class_name_suffix}'
+        in_k_class_map[new_key] = key
+
+    return in_k_class_map, in_class_map
 
 # Main function to scrape advisors for all programs
 def scrape_all_programs():
@@ -131,22 +168,9 @@ def scrape_all_programs():
         "K67": "https://courses.uet.edu.vn/course/index.php?categoryid=77",
     }
 
-
-    with pdfplumber.open("/home/huy/Code/Personal/KLTN/be/db/script/professor/source/name-conversion.pdf") as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            lines = text.split('\n')
-            for line in lines:
-                parts = line.split()
-                if not parts[0].isdigit():
-                    continue
-                class_map[parts[1]] = parts[2]
-
-    for key, value in class_map.items():
-        year = int(key[3:7])
-        k = year - 1955
-        class_name_suffix = ''.join(key[13:].split('-'))
-        k_class_map['K' + str(k) + class_name_suffix] = key
+    pdf_path = "/home/huy/Code/Personal/KLTN/be/db/script/professor/source/name-conversion.pdf"
+    global k_class_map, class_map
+    k_class_map, class_map = get_class_maps(pdf_path)
 
 
     for school_year, base_url in years.items():
