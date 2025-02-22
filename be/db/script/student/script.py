@@ -123,6 +123,7 @@ if __name__ == "__main__":
     for filename in os.listdir(pdf_directory):
         pdf_path = None
         data = None
+        # filename = "/home/huy/Code/Personal/KLTN/be/db/script/student/source_backup/DSSV-k69.pdf"
         if filename.endswith(".pdf"):
             pdf_path = os.path.join(pdf_directory, filename)
         if pdf_path:

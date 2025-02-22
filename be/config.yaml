@@ -1,0 +1,24 @@
+# config.yaml
+server:
+  port: "8080"
+
+database:
+  url: "${DATABASE_URL}"
+
+cors:
+  allow_origins: *
+  allow_methods: *
+  allow_headers: *
+  expose_headers: *
+  allow_credentials: true
+
+openai:
+  api_key: "${OPENAI_API_KEY}"
+
+gemini:
+  api_key: "${GEMINI_API_KEY}"
+  sandbox: true
+
+jwt:
+  secret_key: "${JWT_SECRET_KEY}"
+  expiry_hours: 24

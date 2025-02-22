@@ -1,59 +1,80 @@
 package main
 
 import (
-	"HNLP/internal/chatbot"
-	HDb "HNLP/internal/db"
+	"HNLP/be/internal/auth"
+	"HNLP/be/internal/chatbot"
+	"HNLP/be/internal/config"
+	HDb "HNLP/be/internal/db"
+	"HNLP/be/internal/llm"
+	"HNLP/be/internal/user"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/sashabaranov/go-openai"
 	"log"
-	"os"
 )
 
 func main() {
-	// TODO: separate code for router
+	// Load configuration
+	cfg, err := config.LoadConfig("config.yaml", ".env")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Initialize router
 	router := gin.Default()
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	LoadEnv()
-	openAIKey := os.Getenv("OPENAI_API_KEY_TEST")
-
-	db, err := HDb.NewHDb("postgres", os.Getenv("DATABASE_URL"))
+	// Initialize database
+	db, err := HDb.NewHDb("postgres", cfg.Database.URL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	defer func() {
-		err := db.Close()
-		if err != nil {
+		if err := db.Close(); err != nil {
 			log.Fatalf("Failed to close database: %v", err)
 		}
 	}()
 
-	// DI pattern: Just manually inject anything here :P (no DI container)
-	openAIClient := openai.NewClient(openAIKey)
-	chatService := chatbot.NewChatService(openAIClient, db)
+	// Configure CORS
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.CORS.AllowOrigins,
+		AllowMethods:     cfg.CORS.AllowMethods,
+		AllowHeaders:     cfg.CORS.AllowHeaders,
+		ExposeHeaders:    cfg.CORS.ExposeHeaders,
+		AllowCredentials: cfg.CORS.AllowCredentials,
+	}))
+
+	// Initialize services
+	openAIClient := openai.NewClient(cfg.OpenAI.APIKey)
+	openAIProvider := llm.NewOpenAIProvider(openAIClient)
+
+	//geminiAIClient, err := genai.NewClient(context.Background(), option.WithAPIKey(cfg.GeminiAI.APIKey))
+	//geminiAIProvider := llm.NewGeminiAIProvider(geminiAIClient)
+
+	chatService := chatbot.NewChatService(openAIProvider, db)
 	chatController := chatbot.NewChatController(chatService)
-	router.POST("/chat", chatController.QueryByChat)
 
-	StartServer(router)
-}
+	router.POST("/v1/chat/completions", func(c *gin.Context) {
+		chatController.ChatStreamHandler(c.Writer, c.Request)
+	})
 
-func StartServer(router *gin.Engine) {
-	err := router.Run(":8080")
-	if err != nil {
-		println("Error starting server")
-		return
-	}
-}
+	// User management
+	userRepository := user.NewRepositoryImpl(db)
+	userService := user.NewServiceImpl(userRepository) // Pass config here
+	userController := user.NewControllerImpl(userService)
+	userController.RegisterRoutes(router)
 
-func LoadEnv() {
-	// TODO: refactor this
-	err := godotenv.Load("/home/huy/GolandProjects/HNLP/.env")
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// Auth management
+	authService := auth.NewServiceImpl(userService, cfg.JWT)
+	authController := auth.NewControllerImpl(authService)
+	authController.RegisterRoutes(router)
+
+	// Start server
+	if err := router.Run(":" + cfg.Server.Port); err != nil {
+		log.Fatalf("Error starting server: %v", err)
 	}
 }
