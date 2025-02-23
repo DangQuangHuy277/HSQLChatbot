@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.LoadConfig("config.yaml", ".env")
+	cfg, err := config.LoadConfig("/home/huy/Code/Personal/KLTN/be/config/config.yaml", "/home/huy/Code/Personal/KLTN/be/config/.env")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}

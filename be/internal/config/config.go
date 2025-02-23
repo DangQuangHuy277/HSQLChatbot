@@ -7,41 +7,41 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	CORS     CORSConfig     `yaml:"cors"`
-	OpenAI   OpenAIConfig   `yaml:"openai"`
-	GeminiAI GeminiAIConfig `yaml:"gemini_ai"`
-	JWT      JWTConfig      `yaml:"jwt"`
+	Server   ServerConfig   `mapstructure:"server"`
+	Database DatabaseConfig `mapstructure:"database"`
+	CORS     CORSConfig     `mapstructure:"cors"`
+	OpenAI   OpenAIConfig   `mapstructure:"openai"`
+	GeminiAI GeminiAIConfig `mapstructure:"gemini_ai"`
+	JWT      JWTConfig      `mapstructure:"jwt"`
 }
 
 type ServerConfig struct {
-	Port string `yaml:"port"`
+	Port string `mapstructure:"port"`
 }
 
 type DatabaseConfig struct {
-	URL string `yaml:"url"`
+	URL string `mapstructure:"url"`
 }
 
 type CORSConfig struct {
-	AllowOrigins     []string `yaml:"allow_origins"`
-	AllowMethods     []string `yaml:"allow_methods"`
-	AllowHeaders     []string `yaml:"allow_headers"`
-	ExposeHeaders    []string `yaml:"expose_headers"`
-	AllowCredentials bool     `yaml:"allow_credentials"`
+	AllowOrigins     []string `mapstructure:"allow_origins"`
+	AllowMethods     []string `mapstructure:"allow_methods"`
+	AllowHeaders     []string `mapstructure:"allow_headers"`
+	ExposeHeaders    []string `mapstructure:"expose_headers"`
+	AllowCredentials bool     `mapstructure:"allow_credentials"`
 }
 
 type OpenAIConfig struct {
-	APIKey string `yaml:"api_key"`
+	APIKey string `mapstructure:"api_key"`
 }
 
 type GeminiAIConfig struct {
-	APIKey string `yaml:"api_key"`
+	APIKey string `mapstructure:"api_key"`
 }
 
 type JWTConfig struct {
-	SecretKey   string        `yaml:"secret_key"`
-	ExpiryHours time.Duration `yaml:"expiry_hours" default:"24"`
+	SecretKey   string        `mapstructure:"secret_key"`
+	ExpiryHours time.Duration `mapstructure:"expiry_hours" default:"24"`
 }
 
 func LoadConfig(configPath string, envPath string) (*Config, error) {
