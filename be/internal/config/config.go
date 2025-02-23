@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
+	"strings"
 	"time"
 )
 
@@ -11,7 +12,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	CORS     CORSConfig     `mapstructure:"cors"`
 	OpenAI   OpenAIConfig   `mapstructure:"openai"`
-	GeminiAI GeminiAIConfig `mapstructure:"gemini_ai"`
+	GeminiAI GeminiAIConfig `mapstructure:"gemini"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
 }
 
@@ -52,6 +53,7 @@ func LoadConfig(configPath string, envPath string) (*Config, error) {
 
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
