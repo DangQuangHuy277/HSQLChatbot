@@ -1,0 +1,11 @@
+
+giang vien:
+ - Xem diem, danh sach sinh vien cho lop minh day
+
+Co van:
+- Xem diem, danh sach sinh vien cho lop minh phu trach
+
+Hoc sinh:
+- Xem thong tin ca nhan, diem, thong tin mon hoc minh hoc
+
+Tao va ap dung RBAC

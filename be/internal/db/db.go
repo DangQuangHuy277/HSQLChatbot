@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -28,8 +29,8 @@ func (hdb *HDb) LoadDDL() (string, error) {
 	return hdb.DDLLoader.LoadDDL(hdb.DB)
 }
 
-func (hdb *HDb) ExecuteAndFormatQuery(query string) (*QueryResult, error) {
-	rows, err := hdb.Queryx(query)
+func (hdb *HDb) ExecuteQuery(ctx context.Context, query string) (*QueryResult, error) {
+	rows, err := hdb.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %v", err)
 	}

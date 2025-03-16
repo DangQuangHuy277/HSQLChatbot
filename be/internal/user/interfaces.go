@@ -14,6 +14,7 @@ type Service interface {
 	GetUserPassword(req GetUserRequest) (*GetUserPasswordResponse, error)
 	GetAllUsers() ([]*GetUserResponse, error)
 	CreateUser(req *CreateUserRequest) error
+	Login(req LoginRequest) (*LoginResponse, error)
 }
 
 type Repository interface {
@@ -36,7 +37,8 @@ type GetUserRequest struct {
 type CreateUserRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
-	Role     string `json:"role" default:"student"`
+	Role     string `json:"role" binding:"required"`
+	Realname string `json:"realname"`
 }
 
 type GetUserPasswordResponse struct {
@@ -46,10 +48,19 @@ type GetUserPasswordResponse struct {
 	Role     Role   `json:"role"`
 }
 
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
 type Role string
 
 const (
-	Student   Role = "student"
-	Professor Role = "professor"
-	Admin     Role = "admin"
+	Student   = "student"
+	Professor = "professor"
+	Admin     = "admin"
 )

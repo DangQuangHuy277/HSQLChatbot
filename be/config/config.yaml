@@ -30,3 +30,6 @@ gemini:
 jwt:
   secret_key: ${JWT_SECRET_KEY}
   expiry_hours: 24
+
+serpapi:
+  api_key: ${SERP_API_KEY}

@@ -29,6 +29,7 @@ func (r *RepositoryImpl) GetByUsername(username string) (User, error) {
 }
 
 func (r *RepositoryImpl) Create(user *User) error {
-	_, err := r.db.Exec("INSERT INTO user_account (username, password) VALUES ($1, $2)", user.Username, user.Password)
+	_, err := r.db.Exec("INSERT INTO user_account (username, password, role, realname) VALUES ($1, $2, $3, $4)",
+		user.Username, user.Password, user.Role, user.Realname)
 	return err
 }

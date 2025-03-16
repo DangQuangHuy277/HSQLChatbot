@@ -1,21 +1,10 @@
 package chatbot
 
-// QueryRequest TODO: Remove this
-type QueryRequest struct {
-	Message string `json:"message"`
-}
-
-// QueryResponse TODO: Remove this
-type QueryResponse struct {
-	Columns []string                 `json:"columns"`
-	Rows    []map[string]interface{} `json:"rows"`
-}
-
 type Message struct {
-	Role    string `json:"role"`
+	Role    string `json:"role"` // Optional, should avoid specify
 	Content string `json:"content"`
-	Type    string `json:"type"`
-	Id      string `json:"id"`
+	Type    string `json:"type"` // Optional
+	Id      string `json:"id"`   // Optional
 }
 
 type ChatRequest struct {
@@ -36,4 +25,12 @@ type Choice struct {
 
 type Delta struct {
 	Content string `json:"content"`
+}
+
+// CourseKeywords contains extracted information about courses and related keywords
+type CourseKeywords struct {
+	CourseCode *string  `json:"course_code" jsonschema:"description=The course code (e.g. CS101) if present in the query"`
+	CourseName *string  `json:"course_name" jsonschema:"description=The name of the course (e.g. Introduction to Programming) if present in the query"`
+	Keywords   []string `json:"keywords" jsonschema:"description=Other key terms related to the query; excluding filler words"`
+	IsValid    bool     `json:"is_valid" jsonschema:"description=True if the query relates to study materials or course; false otherwise"`
 }

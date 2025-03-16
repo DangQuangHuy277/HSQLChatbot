@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Navbar from "./components/Navbar/Navbar";
 import DefaultIdeas from "./components/DefaultIdea/DefaultIdeas";
 import UserQuery from "./components/UserInput/UserQuery";
-import GptIntro from "./components/Ui/GptIntro";
+import BotSelector from "./components/Ui/BotSelector";
 import { IonIcon, setupIonicReact } from "@ionic/react";
 import { menuOutline, addOutline } from "ionicons/icons";
 import Header from "./components/Header/Header";
@@ -54,7 +54,7 @@ function App() {
           "md:ml-[260px]": active,
         })}
       >
-        {isChatsVisible ? <Header /> : <GptIntro />}
+        {isChatsVisible ? <Header /> : <BotSelector />}
         {isChatsVisible && <Chats />}
         <div
           className={classNames(
@@ -81,9 +81,6 @@ function App() {
           </div>
         </div>
       </main>
-      <Modal visible={!Boolean(userHasApiKey)}>
-        <Apikey />
-      </Modal>
     </div>
   );
 }

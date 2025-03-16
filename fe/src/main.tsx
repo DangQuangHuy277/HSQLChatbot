@@ -6,7 +6,5 @@ import "./assets/css/main.css";
 import "@ionic/react/css/core.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
     <App />
-  </React.StrictMode>
 );

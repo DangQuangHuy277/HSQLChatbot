@@ -1,3 +1,4 @@
+--Public: all
 CREATE TABLE IF NOT EXISTS faculty
 (
     id   SERIAL PRIMARY KEY,
@@ -5,6 +6,7 @@ CREATE TABLE IF NOT EXISTS faculty
     type VARCHAR(50)
 );
 
+--Each professor can only access their own data
 CREATE TABLE IF NOT EXISTS professor
 (
     id            SERIAL PRIMARY KEY,
@@ -17,6 +19,7 @@ CREATE TABLE IF NOT EXISTS professor
 );
 
 
+-- Public: all
 CREATE TABLE IF NOT EXISTS program
 (
     id                SERIAL PRIMARY KEY,
@@ -29,6 +32,7 @@ CREATE TABLE IF NOT EXISTS program
 );
 
 
+-- Only advisors or student in this class can access his/her own class
 CREATE TABLE IF NOT EXISTS administrative_class
 (
     id         SERIAL PRIMARY KEY,
@@ -45,6 +49,7 @@ CREATE TABLE IF NOT EXISTS semester
     name VARCHAR(100)
 );
 
+-- Public: all
 CREATE TABLE IF NOT EXISTS course
 (
     id               SERIAL PRIMARY KEY,
@@ -58,7 +63,7 @@ CREATE TABLE IF NOT EXISTS course
     prerequisite     INT                          -- Foreign key to the prerequisite course
 );
 
-
+-- Public: all
 CREATE TABLE IF NOT EXISTS course_program -- Junction table for many-to-many relationship between course and program
 (
     course_id  INT NOT NULL,            -- Foreign key to the course
@@ -68,7 +73,7 @@ CREATE TABLE IF NOT EXISTS course_program -- Junction table for many-to-many rel
 --     FOREIGN KEY (program_id) REFERENCES program(id)
 );
 
-
+--Public:all
 CREATE TABLE IF NOT EXISTS course_class
 (
     id           SERIAL PRIMARY KEY,
@@ -81,7 +86,7 @@ CREATE TABLE IF NOT EXISTS course_class
 -- FOREIGN KEY (professor_id) REFERENCES professor (id)
 );
 
-
+-- Public: all
 CREATE TABLE IF NOT EXISTS course_class_schedule
 (
     id               SERIAL PRIMARY KEY,
@@ -101,6 +106,7 @@ CREATE TABLE IF NOT EXISTS course_class_schedule
 --             )
 );
 
+-- Public: all
 create table course_schedule_instructor
 (
     course_class_schedule_id integer,
@@ -145,6 +151,7 @@ CREATE TABLE IF NOT EXISTS student_scholarship
 --     FOREIGN KEY (scholarship_id) REFERENCES scholarship (id) ON DELETE CASCADE -- Cascade deletion when scholarship is deleted
 );
 
+-- Each student can only access their own data
 CREATE TABLE IF NOT EXISTS student
 (
     id                      SERIAL PRIMARY KEY,
@@ -154,11 +161,12 @@ CREATE TABLE IF NOT EXISTS student
     birthday                DATE,                        -- Birthday (e.g., '2000-01-15')
     email                   VARCHAR(100),                -- Email address
     program_id              INT,                         -- Foreign key to program
-    administrative_class_id INT                          -- Foreign key to administrative_class
+    administrative_class_id INT                           -- Foreign key to administrative_class
 --     FOREIGN KEY (program_id) REFERENCES program (id),
 --     FOREIGN KEY (administrative_class_id) REFERENCES administrative_class (id)
 );
 
+-- User can view data of students in the same class
 CREATE TABLE IF NOT EXISTS student_course_class
 (
     id              SERIAL PRIMARY KEY,   -- Added id
@@ -171,6 +179,7 @@ CREATE TABLE IF NOT EXISTS student_course_class
 --     FOREIGN KEY (course_class_id) REFERENCES course_class (id)
 );
 
+-- User can view data of students in the same class
 CREATE TABLE IF NOT EXISTS student_course_class_schedule
 (
     id                       SERIAL PRIMARY KEY,                -- Added id

@@ -1,16 +1,21 @@
 package user
 
 import (
+	"HNLP/be/internal/auth"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type ServiceImpl struct {
-	repo Repository
+	jwtService auth.Service
+	repo       Repository
 }
 
-func NewServiceImpl(repo Repository) *ServiceImpl {
-	return &ServiceImpl{repo: repo}
+func NewServiceImpl(jwtService auth.Service, repo Repository) *ServiceImpl {
+	return &ServiceImpl{
+		jwtService: jwtService,
+		repo:       repo,
+	}
 }
 
 func (s *ServiceImpl) GetUser(req GetUserRequest) (*GetUserResponse, error) {
@@ -78,10 +83,33 @@ func (s *ServiceImpl) CreateUser(req *CreateUserRequest) error {
 		Username: req.Username,
 		Password: string(hashedPassword),
 		Role:     Role(req.Role),
+		Realname: req.Realname,
 	}
 	err = s.repo.Create(user)
 	if err != nil {
 		return errors.New("failed to create user")
 	}
 	return nil
+}
+
+func (s *ServiceImpl) Login(req LoginRequest) (*LoginResponse, error) {
+	userResponse, err := s.GetUserPassword(GetUserRequest{Username: req.Username})
+	if err != nil {
+		return nil, err
+	}
+
+	if userResponse == nil {
+		return nil, errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(userResponse.Password), []byte(req.Password)); err != nil {
+		return nil, errors.New("invalid password")
+	}
+
+	token, err := s.jwtService.GenerateToken(userResponse.ID, userResponse.Username, string(userResponse.Role))
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginResponse{Token: token}, nil
 }

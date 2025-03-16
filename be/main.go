@@ -4,8 +4,10 @@ import (
 	"HNLP/be/internal/auth"
 	"HNLP/be/internal/chatbot"
 	"HNLP/be/internal/config"
+	"HNLP/be/internal/course"
 	HDb "HNLP/be/internal/db"
 	"HNLP/be/internal/llm"
+	"HNLP/be/internal/search"
 	"HNLP/be/internal/user"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -26,19 +28,6 @@ func main() {
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
-
-	// Initialize database
-	db, err := HDb.NewHDb("postgres", cfg.Database.URL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Fatalf("Failed to close database: %v", err)
-		}
-	}()
-
 	// Configure CORS
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.CORS.AllowOrigins,
@@ -48,6 +37,21 @@ func main() {
 		AllowCredentials: cfg.CORS.AllowCredentials,
 	}))
 
+	// Initialize database
+	db, err := HDb.NewHDb("postgres", cfg.Database.URL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatalf("Failed to close database: %v", err)
+		}
+	}()
+
+	// Init function registry
+	funcRegistry := llm.NewFunctionRegistryImpl()
+	funcRegistry.Register(llm.FuncWrapper("ExecuteQuery", "Run a SQL query to my university database and return the result in a JSON format", db.ExecuteQuery))
+
 	// Initialize services
 	openAIClient := openai.NewClient(cfg.OpenAI.APIKey)
 	openAIProvider := llm.NewOpenAIProvider(openAIClient)
@@ -55,23 +59,23 @@ func main() {
 	//geminiAIClient, err := genai.NewClient(context.Background(), option.WithAPIKey(cfg.GeminiAI.APIKey))
 	//geminiAIProvider := llm.NewGeminiAIProvider(geminiAIClient)
 
-	chatService := chatbot.NewChatService(openAIProvider, db)
-	chatController := chatbot.NewChatController(chatService)
-
-	router.POST("/v1/chat/completions", func(c *gin.Context) {
-		chatController.ChatStreamHandler(c.Writer, c.Request)
-	})
-
 	// User management
+	jwtService := auth.NewServiceImpl(cfg.JWT)
 	userRepository := user.NewRepositoryImpl(db)
-	userService := user.NewServiceImpl(userRepository) // Pass config here
+	userService := user.NewServiceImpl(jwtService, userRepository) // Pass config here
 	userController := user.NewControllerImpl(userService)
-	userController.RegisterRoutes(router)
+	userController.RegisterRoutes(router, jwtService)
 
-	// Auth management
-	authService := auth.NewServiceImpl(userService, cfg.JWT)
-	authController := auth.NewControllerImpl(authService)
-	authController.RegisterRoutes(router)
+	// Course management
+	courseRepo := course.NewRepositoryImpl(db)
+	courseService := course.NewServiceImpl(courseRepo)
+
+	// Search
+	searchService := search.NewSearchService(cfg.SerpApi)
+
+	chatService := chatbot.NewChatService(openAIProvider, db, searchService, courseService)
+	chatController := chatbot.NewChatController(chatService)
+	chatController.RegisterRoutes(router, jwtService)
 
 	// Start server
 	if err := router.Run(":" + cfg.Server.Port); err != nil {

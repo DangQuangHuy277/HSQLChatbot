@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
+	"os"
 	"strings"
 	"time"
 )
@@ -14,6 +15,7 @@ type Config struct {
 	OpenAI   OpenAIConfig   `mapstructure:"openai"`
 	GeminiAI GeminiAIConfig `mapstructure:"gemini"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
+	SerpApi  SerpApiConfig  `mapstructure:"serpapi"`
 }
 
 type ServerConfig struct {
@@ -42,7 +44,11 @@ type GeminiAIConfig struct {
 
 type JWTConfig struct {
 	SecretKey   string        `mapstructure:"secret_key"`
-	ExpiryHours time.Duration `mapstructure:"expiry_hours" default:"24"`
+	ExpiryHours time.Duration `mapstructure:"expiry_hours"`
+}
+
+type SerpApiConfig struct {
+	APIKey string `mapstructure:"api_key"`
 }
 
 func LoadConfig(configPath string, envPath string) (*Config, error) {
@@ -58,6 +64,18 @@ func LoadConfig(configPath string, envPath string) (*Config, error) {
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
+	}
+
+	// Process the config to expand environment variables
+	for _, key := range viper.AllKeys() {
+		val := viper.GetString(key)
+		if strings.HasPrefix(val, "${") && strings.HasSuffix(val, "}") {
+			envVar := strings.TrimSuffix(strings.TrimPrefix(val, "${"), "}")
+			envVal := os.Getenv(envVar)
+			if envVal != "" {
+				viper.Set(key, envVal)
+			}
+		}
 	}
 
 	var config Config

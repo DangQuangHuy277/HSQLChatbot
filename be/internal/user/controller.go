@@ -1,6 +1,8 @@
 package user
 
 import (
+	"HNLP/be/internal/auth"
+	"HNLP/be/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -73,10 +75,27 @@ func (c *ControllerImpl) CreateUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, gin.H{"message": "user created"})
 }
 
+// Login handler
+func (c *ControllerImpl) Login(ctx *gin.Context) {
+	var req LoginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+
+	token, err := c.service.Login(req)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, token)
+}
+
 // RegisterRoutes to set up Gin routes
-func (c *ControllerImpl) RegisterRoutes(router *gin.Engine) {
-	router.GET("/users/:id", c.GetUser)
+func (c *ControllerImpl) RegisterRoutes(router *gin.Engine, service auth.Service) {
+	router.GET("/users/:id", middleware.Authenticate(service), c.GetUser)
 	router.GET("/users/search", c.SearchUser)
 	router.GET("/users", c.GetAllUsers)
 	router.POST("/users", c.CreateUser)
+	router.POST("/login", c.Login)
 }
