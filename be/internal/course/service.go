@@ -1,6 +1,9 @@
 package course
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 type ServiceImpl struct {
 	repo Repository
@@ -12,13 +15,13 @@ func NewServiceImpl(repo Repository) *ServiceImpl {
 	}
 }
 
-func (s *ServiceImpl) GetCourse(req GetCourseRequest) (*GetCourseResponse, error) {
+func (s *ServiceImpl) GetCourse(ctx context.Context, req GetCourseRequest) (*GetCourseResponse, error) {
 	var course Course
 	var err error
 
 	// Try ID first if provided
 	if req.Code != nil {
-		course, err = s.repo.GetByCode(*req.Code)
+		course, err = s.repo.GetByCode(ctx, *req.Code)
 		if err == nil {
 			return &GetCourseResponse{
 				Code:        course.Code,
@@ -31,7 +34,7 @@ func (s *ServiceImpl) GetCourse(req GetCourseRequest) (*GetCourseResponse, error
 	// Try name if provided (either as fallback from ID or direct request)
 	if req.Name != nil {
 		// Try regular name
-		course, err = s.repo.GetByName(*req.Name)
+		course, err = s.repo.GetByName(ctx, *req.Name)
 		if err == nil {
 			return &GetCourseResponse{
 				Code:        course.Code,
@@ -41,7 +44,7 @@ func (s *ServiceImpl) GetCourse(req GetCourseRequest) (*GetCourseResponse, error
 		}
 
 		// Try English name
-		course, err = s.repo.GetByEnglishName(*req.Name)
+		course, err = s.repo.GetByEnglishName(ctx, *req.Name)
 		if err == nil {
 			return &GetCourseResponse{
 				Code:        course.Code,

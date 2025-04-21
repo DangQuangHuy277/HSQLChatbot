@@ -15,6 +15,10 @@ type QueryResult struct {
 	Data []map[string]interface{} `json:"data"`
 }
 
+type QueryRequest struct {
+	Query string `json:"query"`
+}
+
 type DDLLoader interface {
 	LoadDDL(db *sqlx.DB) (string, error)
 }

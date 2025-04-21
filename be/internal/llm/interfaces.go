@@ -26,10 +26,11 @@ const (
 
 // Message -related structs
 type Message struct {
-	Role     string     `json:"role"`
-	Content  string     `json:"content"`
-	ToolCall []ToolCall `json:"tool_call,omitempty"`
-	Id       string     `json:"id"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_call,omitempty"`
+	ToolCallId string     `json:"tool_call_id,omitempty"`
+	Id         string     `json:"id"`
 }
 
 // ToolCall represents an actual tool invocation by the model

@@ -22,7 +22,7 @@ func (c *ControllerImpl) GetUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
-	user, err := c.service.GetUser(req)
+	user, err := c.service.GetUser(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -37,7 +37,7 @@ func (c *ControllerImpl) SearchUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID"})
 		return
 	}
-	user, err := c.service.GetUser(req)
+	user, err := c.service.GetUser(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -47,7 +47,7 @@ func (c *ControllerImpl) SearchUser(ctx *gin.Context) {
 
 // GetAllUsers handler
 func (c *ControllerImpl) GetAllUsers(ctx *gin.Context) {
-	users, err := c.service.GetAllUsers()
+	users, err := c.service.GetAllUsers(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,7 +67,7 @@ func (c *ControllerImpl) CreateUser(ctx *gin.Context) {
 		return
 	}
 
-	err := c.service.CreateUser(&req)
+	err := c.service.CreateUser(ctx, &req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -83,7 +83,7 @@ func (c *ControllerImpl) Login(ctx *gin.Context) {
 		return
 	}
 
-	token, err := c.service.Login(req)
+	token, err := c.service.Login(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

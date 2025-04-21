@@ -2,6 +2,7 @@ package user
 
 import (
 	"HNLP/be/internal/auth"
+	"context"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,10 +19,10 @@ func NewServiceImpl(jwtService auth.Service, repo Repository) *ServiceImpl {
 	}
 }
 
-func (s *ServiceImpl) GetUser(req GetUserRequest) (*GetUserResponse, error) {
-	user, err := s.repo.GetById(req.ID)
+func (s *ServiceImpl) GetUser(ctx context.Context, req GetUserRequest) (*GetUserResponse, error) {
+	user, err := s.repo.GetById(ctx, req.ID)
 	if user == (User{}) {
-		user, err = s.repo.GetByUsername(req.Username)
+		user, err = s.repo.GetByUsername(ctx, req.Username)
 	}
 	if err != nil {
 		return nil, errors.New("user not found")
@@ -32,10 +33,10 @@ func (s *ServiceImpl) GetUser(req GetUserRequest) (*GetUserResponse, error) {
 	}, nil
 }
 
-func (s *ServiceImpl) GetUserPassword(req GetUserRequest) (*GetUserPasswordResponse, error) {
-	user, err := s.repo.GetById(req.ID)
+func (s *ServiceImpl) GetUserPassword(ctx context.Context, req GetUserRequest) (*GetUserPasswordResponse, error) {
+	user, err := s.repo.GetById(ctx, req.ID)
 	if user == (User{}) {
-		user, err = s.repo.GetByUsername(req.Username)
+		user, err = s.repo.GetByUsername(ctx, req.Username)
 	}
 	if err != nil {
 		return nil, errors.New("user not found")
@@ -48,8 +49,8 @@ func (s *ServiceImpl) GetUserPassword(req GetUserRequest) (*GetUserPasswordRespo
 	}, nil
 }
 
-func (s *ServiceImpl) GetAllUsers() ([]*GetUserResponse, error) {
-	users, err := s.repo.GetAll()
+func (s *ServiceImpl) GetAllUsers(ctx context.Context) ([]*GetUserResponse, error) {
+	users, err := s.repo.GetAll(ctx)
 	if err != nil {
 		return nil, errors.New("failed to get users")
 	}
@@ -63,9 +64,9 @@ func (s *ServiceImpl) GetAllUsers() ([]*GetUserResponse, error) {
 	return response, nil
 }
 
-func (s *ServiceImpl) CreateUser(req *CreateUserRequest) error {
+func (s *ServiceImpl) CreateUser(ctx context.Context, req *CreateUserRequest) error {
 	// Validate req
-	existingUser, err := s.repo.GetByUsername(req.Username)
+	existingUser, err := s.repo.GetByUsername(ctx, req.Username)
 	if existingUser != (User{}) {
 		return errors.New("user already exists")
 	}
@@ -85,15 +86,15 @@ func (s *ServiceImpl) CreateUser(req *CreateUserRequest) error {
 		Role:     Role(req.Role),
 		Realname: req.Realname,
 	}
-	err = s.repo.Create(user)
+	err = s.repo.Create(ctx, user)
 	if err != nil {
 		return errors.New("failed to create user")
 	}
 	return nil
 }
 
-func (s *ServiceImpl) Login(req LoginRequest) (*LoginResponse, error) {
-	userResponse, err := s.GetUserPassword(GetUserRequest{Username: req.Username})
+func (s *ServiceImpl) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
+	userResponse, err := s.GetUserPassword(ctx, GetUserRequest{Username: req.Username})
 	if err != nil {
 		return nil, err
 	}

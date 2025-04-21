@@ -20,12 +20,19 @@ func NewOpenAIProvider(client *openai.Client) *OpenAIProvider {
 
 func (p *OpenAIProvider) Complete(ctx context.Context, req CompletionRequest) (Message, error) {
 	// Create the request object
+	if req.Model == "" {
+		req.Model = openai.GPT4oMini20240718
+	}
+
 	chatRequest := openai.ChatCompletionRequest{
 		Model:          req.Model,
 		Messages:       toOpenAIMessages(req.Messages),
 		ResponseFormat: toOpenAIResponseFormat(req.ResponseFormat),
 		Tools:          toOpenAITools(req.Tools),
-		ToolChoice:     req.FunctionCallingMode,
+	}
+
+	if req.FunctionCallingMode != "" {
+		chatRequest.ToolChoice = req.FunctionCallingMode
 	}
 
 	// Log request for debugging
@@ -96,16 +103,19 @@ func (p *OpenAIProvider) StreamComplete(ctx context.Context, req CompletionReque
 
 func toOpenAIMessage(msg Message) openai.ChatCompletionMessage {
 	return openai.ChatCompletionMessage{
-		Role:    msg.Role,
-		Content: msg.Content,
+		Role:       msg.Role,
+		Content:    msg.Content,
+		ToolCalls:  toOpenAIToolCalls(msg.ToolCalls),
+		ToolCallID: msg.ToolCallId,
 	}
 }
 
 func fromOpenAIMessage(msg openai.ChatCompletionMessage) Message {
 	return Message{
-		Role:     msg.Role,
-		Content:  msg.Content,
-		ToolCall: toToolCall(msg.ToolCalls),
+		Role:       msg.Role,
+		Content:    msg.Content,
+		ToolCalls:  toToolCall(msg.ToolCalls),
+		ToolCallId: msg.ToolCallID,
 	}
 }
 
@@ -140,11 +150,24 @@ func toOpenAITools(tools []Tool) []openai.Tool {
 	return result
 }
 
+func toOpenAIToolCalls(toolCalls []ToolCall) []openai.ToolCall {
+	result := make([]openai.ToolCall, len(toolCalls))
+	for i, toolCall := range toolCalls {
+		result[i] = openai.ToolCall{
+			ID:       toolCall.ID,
+			Type:     convertToolType(toolCall.Type),
+			Function: openai.FunctionCall{Name: toolCall.Function.Name, Arguments: toolCall.Function.Arguments},
+		}
+	}
+	return result
+
+}
+
 func toOpenAIFunction(function *FuncDefinition) *openai.FunctionDefinition {
 	return &openai.FunctionDefinition{
 		Name:        function.Name,
 		Description: function.Description,
-		Strict:      true,
+		Strict:      false,
 		Parameters:  function.Parameters,
 	}
 }

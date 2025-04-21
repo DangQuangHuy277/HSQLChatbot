@@ -1,6 +1,9 @@
 package user
 
-import "github.com/gin-gonic/gin"
+import (
+	"context"
+	"github.com/gin-gonic/gin"
+)
 
 type Controller interface {
 	GetUser(ctx *gin.Context) error
@@ -10,18 +13,18 @@ type Controller interface {
 }
 
 type Service interface {
-	GetUser(req GetUserRequest) (*GetUserResponse, error)
-	GetUserPassword(req GetUserRequest) (*GetUserPasswordResponse, error)
-	GetAllUsers() ([]*GetUserResponse, error)
-	CreateUser(req *CreateUserRequest) error
-	Login(req LoginRequest) (*LoginResponse, error)
+	GetUser(ctx context.Context, req GetUserRequest) (*GetUserResponse, error)
+	GetUserPassword(ctx context.Context, req GetUserRequest) (*GetUserPasswordResponse, error)
+	GetAllUsers(ctx context.Context) ([]*GetUserResponse, error)
+	CreateUser(ctx context.Context, req *CreateUserRequest) error
+	Login(ctx context.Context, req LoginRequest) (*LoginResponse, error)
 }
 
 type Repository interface {
-	GetById(id int) (User, error)
-	GetAll() ([]User, error)
-	GetByUsername(username string) (User, error)
-	Create(user *User) error
+	GetById(ctx context.Context, id int) (User, error)
+	GetAll(ctx context.Context) ([]User, error)
+	GetByUsername(ctx context.Context, username string) (User, error)
+	Create(ctx context.Context, user *User) error
 }
 
 type GetUserResponse struct {

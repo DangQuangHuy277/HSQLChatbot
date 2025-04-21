@@ -19,6 +19,8 @@ type FuncDefinition struct {
 // FuncHandler is the standard tool handler signature
 type FuncHandler func(ctx context.Context, args map[string]interface{}) (interface{}, error)
 
+type FuncHandlerV2[T any, R any] func(ctx context.Context, args T) (R, error)
+
 type FuncRegistry interface {
 	Register(fn FuncDefinition)
 	Execute(ctx context.Context, toolCall ToolCall) (string, error)
@@ -75,6 +77,7 @@ func (r *FuncRegistryImpl) GetFuncDefinitions() []FuncDefinition {
 }
 
 // FuncWrapper adapts a typed function into a FuncDefinition with inferred schema
+// Currently,it only supports functions with a single argument with type struct (DTO)
 func FuncWrapper[T any, R any](name string, description string, fn func(ctx context.Context, args T) (R, error)) FuncDefinition {
 	// Create a schema reflector for parameter type T
 	reflector := jsonschema.Reflector{
@@ -86,8 +89,8 @@ func FuncWrapper[T any, R any](name string, description string, fn func(ctx cont
 	schema := reflector.Reflect(new(T))
 
 	// Create the handler function that adapts the typed function
-	handler := func(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-		argsJSON, err := json.Marshal(args)
+	handler := func(ctx context.Context, innerArgs map[string]interface{}) (interface{}, error) {
+		argsJSON, err := json.Marshal(innerArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal args: %v", err)
 		}

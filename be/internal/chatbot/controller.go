@@ -78,7 +78,7 @@ func (cc *ChatController) ChatStreamHandler(ctx *gin.Context) {
 	// 4. Enhance context with user data (optional)
 	reqCtx := ctx.Request.Context()
 
-	err := cc.chatService.StreamChatResponse(reqCtx, request, w, userId, role)
+	err := cc.chatService.StreamChatResponseV2(reqCtx, request, w, userId, role)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			log.Println("Client disconnected during streaming")

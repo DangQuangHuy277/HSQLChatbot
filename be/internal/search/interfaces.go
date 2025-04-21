@@ -5,18 +5,6 @@ import "context"
 type Service interface {
 	// Search performs a generic search across all platforms
 	Search(ctx context.Context, keywords []string) ([]Resource, error)
-
-	// SearchYouTube searches YouTube for videos (e.g., lectures, tutorials)
-	SearchYouTube(ctx context.Context, keywords []string) ([]YouTubeVideo, error)
-
-	// SearchArXiv searches arXiv for academic papers
-	SearchArXiv(ctx context.Context, keywords []string) ([]ArXivPaper, error)
-
-	// SearchOpenLibrary searches Open Library for books
-	SearchOpenLibrary(ctx context.Context, keywords []string) ([]Book, error)
-
-	// SearchGoogle searches Google via SerpApi for web resources
-	SearchGoogle(ctx context.Context, keywords []string) ([]Resource, error)
 }
 
 // Resource is a generic search result (for broad searches)

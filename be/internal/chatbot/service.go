@@ -1,7 +1,6 @@
 package chatbot
 
 import (
-	"HNLP/be/internal/course"
 	"HNLP/be/internal/db"
 	"HNLP/be/internal/llm"
 	"HNLP/be/internal/search"
@@ -26,6 +25,15 @@ Rules:
 - Return only the SQL query, no extra text or formatting, not start with sql so that I can use this directly to run.
 Schema:
 `
+	ToolPromptTemplate = `You are a chatbot for the university database. 
+Your task is base on given tool, answer user query.
+You should prioritize the function call that is most relevant to the user query.
+In case you don't find any relevant function, you generate a Postgres SQL to use executeQuery function to run SQL query.
+You should not use any other function to retrieve data.
+Here is the database schema: %s
+
+User Id is %d, User role is %s.
+Here is the user query: %s`
 )
 
 // IChatService defines the interface for chat services.
@@ -34,23 +42,183 @@ type IChatService interface {
 
 // ChatService implements the IChatService interface.
 type ChatService struct {
-	aiProvider llm.AIProvider
-	db         *db.HDb
-	searchSrv  search.Service
-	courseSrv  course.Service
-	//funcRegistry llm.FuncRegistry
+	aiProvider   llm.AIProvider
+	db           db.HDb
+	searchSrv    search.Service
+	funcRegistry llm.FuncRegistry
 }
 
 // NewChatService creates a new instance of ChatService.
-func NewChatService(aiProvider llm.AIProvider, db *db.HDb, searchSrv search.Service, courseSrv course.Service) *ChatService {
+func NewChatService(aiProvider llm.AIProvider, db db.HDb, searchSrv search.Service, funcRegistry llm.FuncRegistry) *ChatService {
 	service := ChatService{
-		aiProvider: aiProvider,
-		db:         db,
-		searchSrv:  searchSrv,
-		courseSrv:  courseSrv,
-		//funcRegistry: funcRegistry,
+		aiProvider:   aiProvider,
+		db:           db,
+		searchSrv:    searchSrv,
+		funcRegistry: funcRegistry,
 	}
 	return &service
+}
+
+func (cs *ChatService) StreamChatResponseV2(ctx context.Context, req ChatRequest, w io.Writer, userId int, role string) error {
+	// Step 1: Validate the user query base on the user role
+	validateResult, err := cs.validateUserQuery(ctx, req.Messages[len(req.Messages)-1].Content, userId, role)
+	if err != nil {
+		log.Printf("Failed to validate user query: %v", err)
+	}
+	if !validateResult.IsValid {
+		err := writeSSEResponse(w, StreamResponse{
+			Choices: []Choice{{Delta: Delta{Content: validateResult.Message}}},
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Step 2: Prepare LLM messages
+	dbDDL, err := cs.db.LoadDDL()
+	toolPrompt := fmt.Sprintf(ToolPromptTemplate, dbDDL, userId, role, req.Messages[len(req.Messages)-1].Content)
+	funcDefs := cs.funcRegistry.GetFuncDefinitions()
+
+	toolResponse, err := cs.getToolCallsByAI(ctx, toolPrompt, funcDefs)
+	if err != nil {
+		log.Printf("Failed to get tool calls: %v", err)
+		return err
+	}
+
+	toolResults := make(map[string]string)
+	for _, toolCall := range toolResponse.ToolCalls {
+		executedResult, err := cs.funcRegistry.Execute(ctx, toolCall)
+		if err != nil {
+			log.Printf("Failed to execute tool call: %v", err)
+			continue
+		}
+
+		toolResults[toolCall.ID] = executedResult
+	}
+
+	// Step 4: Recall the AI provider to get the final answer
+	naturalLangRequest := llm.CompletionRequest{
+		Messages: []llm.Message{
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: toolPrompt,
+			},
+			{
+				Role:       openai.ChatMessageRoleAssistant,
+				Content:    toolResponse.Content,
+				ToolCalls:  toolResponse.ToolCalls,
+				ToolCallId: toolResponse.ToolCallId,
+				Id:         toolResponse.Id,
+			},
+		},
+		Model: openai.GPT4oMini20240718,
+	}
+
+	for toolId, result := range toolResults {
+		naturalLangRequest.Messages = append(naturalLangRequest.Messages, llm.Message{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    result,
+			ToolCallId: toolId,
+		})
+	}
+
+	// Step 5: Stream the response
+	chunks, err := cs.aiProvider.StreamComplete(ctx, naturalLangRequest)
+	if err != nil {
+		log.Printf("Failed to stream complete results: %v", err)
+		return err
+	}
+
+	for chunk := range chunks {
+		if chunk.Done {
+			fmt.Fprintf(w, "data: [DONE]\n\n")
+			return nil
+		}
+
+		// Format SSE response
+		resp := StreamResponse{
+			Choices: []Choice{{Delta: Delta{Content: chunk.Content}}},
+		}
+
+		if err := writeSSEResponse(w, resp); err != nil {
+			return err
+		}
+	}
+
+	return nil
+
+}
+
+func (cs *ChatService) getToolCallsByAI(ctx context.Context, toolPrompt string, funcDefs []llm.FuncDefinition) (llm.Message, error) {
+	toolRequest := llm.CompletionRequest{
+		Messages: []llm.Message{
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: toolPrompt,
+			},
+		},
+		Model:               openai.O3Mini20250131,
+		Tools:               make([]llm.Tool, 0),
+		FunctionCallingMode: llm.Required,
+	}
+
+	// Convert function definitions to tools
+	for _, funcDef := range funcDefs {
+		toolRequest.Tools = append(toolRequest.Tools, llm.Tool{
+			Type:     llm.ToolTypeFunction,
+			Function: &funcDef,
+		})
+	}
+
+	// Step 3: Get tool call
+	toolResponse, err := cs.aiProvider.Complete(ctx, toolRequest)
+	return toolResponse, err
+}
+
+// ValidationResult holds the outcome of query validation
+type ValidationResult struct {
+	IsValid bool   `json:"is_valid" jsonschema:"description=Indicates if the query is valid based on user role"`
+	Message string `json:"message" jsonschema:"description=Detailed message about the validation result"`
+}
+
+func (cs *ChatService) validateUserQuery(ctx context.Context, query string, userId int, role string) (ValidationResult, error) {
+	prompt := fmt.Sprintf(`You are an agent that validates user queries for a university database. Here is the policy for each role:
+These table, info are accessible for all roles: program, semester, course, course infomation, course_class, course_schedule, course_schedule_instructor. Other than these info, the user need to follow the policy below.
+- Student role: Can only access their own personal info, course, administrative class and corresponding advisor, grades and above public data
+- Professor role: Can only access their own personal info, courses they teach, corresponding students and grades, schedules and above public data
+- Admin role: Can access all data.`)
+	prompt += fmt.Sprintf("User role: %s, User ID: %d, User query: %s", role, userId, query)
+
+	reflector := jsonschema.Reflector{
+		DoNotReference: true,
+		ExpandedStruct: false,
+	}
+
+	validationRequest := llm.CompletionRequest{
+		Messages: []llm.Message{
+			{
+				Content: prompt,
+				Role:    openai.ChatMessageRoleUser,
+			},
+		},
+		ResponseFormat: &llm.ResponseFormat{
+			Type:   llm.ResponseFormatTypeJson,
+			Schema: reflector.Reflect(&ValidationResult{}),
+			Name:   "ValidationResult",
+		},
+	}
+
+	response, err := cs.aiProvider.Complete(ctx, validationRequest)
+	if err != nil {
+		return ValidationResult{}, fmt.Errorf("failed to validate user query: %v", err)
+	}
+
+	var result ValidationResult
+	if err := json.Unmarshal([]byte(response.Content), &result); err != nil {
+		return ValidationResult{}, fmt.Errorf("failed to parse validation response: %v", err)
+	}
+
+	return result, nil
 }
 
 // StreamChatResponse streams responses from the chat service using Server-Sent Events (SSE).
@@ -117,7 +285,9 @@ func (cs *ChatService) StreamChatResponse(ctx context.Context, req ChatRequest, 
 	log.Printf("SQL Query: %s", sqlQuery.Content)
 
 	// Step 4: Execute the SQL query
-	queryResult, err := cs.db.ExecuteQuery(ctx, sqlQuery.Content)
+	queryResult, err := cs.db.ExecuteQuery(ctx, db.QueryRequest{
+		Query: sqlQuery.Content,
+	})
 	if err != nil {
 		log.Printf("Failed to execute query: %v", err)
 	}

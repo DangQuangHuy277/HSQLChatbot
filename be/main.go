@@ -48,10 +48,6 @@ func main() {
 		}
 	}()
 
-	// Init function registry
-	funcRegistry := llm.NewFunctionRegistryImpl()
-	funcRegistry.Register(llm.FuncWrapper("ExecuteQuery", "Run a SQL query to my university database and return the result in a JSON format", db.ExecuteQuery))
-
 	// Initialize services
 	openAIClient := openai.NewClient(cfg.OpenAI.APIKey)
 	openAIProvider := llm.NewOpenAIProvider(openAIClient)
@@ -73,7 +69,12 @@ func main() {
 	// Search
 	searchService := search.NewSearchService(cfg.SerpApi)
 
-	chatService := chatbot.NewChatService(openAIProvider, db, searchService, courseService)
+	// Init function registry, after we inits all the services and before we inits the chatbot
+	funcRegistry := llm.NewFunctionRegistryImpl()
+	funcRegistry.Register(llm.FuncWrapper("ExecuteQuery", "Run a SQL query to my university database and return the result in a JSON format", db.ExecuteQuery))
+	funcRegistry.Register(llm.FuncWrapper("GetCourse", "Get course information by code or name", courseService.GetCourse))
+
+	chatService := chatbot.NewChatService(openAIProvider, db, searchService, funcRegistry)
 	chatController := chatbot.NewChatController(chatService)
 	chatController.RegisterRoutes(router, jwtService)
 

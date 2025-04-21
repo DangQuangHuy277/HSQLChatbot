@@ -159,8 +159,7 @@ CREATE TABLE IF NOT EXISTS student
     name                    VARCHAR(100),                -- Student's full name
     gender                  VARCHAR(20),                 -- Gender (e.g., 'Male', 'Female', 'Non-binary')
     birthday                DATE,                        -- Birthday (e.g., '2000-01-15')
-    email                   VARCHAR(100),                -- Email address
-    program_id              INT,                         -- Foreign key to program
+    email                   VARCHAR(100),                -- Email address                       -- Foreign key to program
     administrative_class_id INT                           -- Foreign key to administrative_class
 --     FOREIGN KEY (program_id) REFERENCES program (id),
 --     FOREIGN KEY (administrative_class_id) REFERENCES administrative_class (id)
