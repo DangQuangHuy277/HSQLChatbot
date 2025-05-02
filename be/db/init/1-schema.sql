@@ -81,7 +81,6 @@ CREATE TABLE IF NOT EXISTS course_class
     code         VARCHAR(10),
     course_id    INT         NOT NULL,
     semester_id  VARCHAR(11) NOT NULL,
-    professor_id INT         NOT NULL,
     UNIQUE (code, semester_id)
 -- FOREIGN KEY (course_id) REFERENCES course (id),
 -- FOREIGN KEY (professor_id) REFERENCES professor (id)

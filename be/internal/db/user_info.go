@@ -13,20 +13,28 @@ type UserInfo struct {
 
 type StudentInfo struct {
 	UserInfo
-	AdministrativeClassID  []int
+	AdministrativeClassID  int
 	EnrolledCourseClassIDs []int
 	EnrolledScheduleIDs    []int
 }
 
 type ProfessorInfo struct {
 	UserInfo
-	AdvisedClassIDs      int
+	AdvisedClassIDs      []int
 	TaughtCourseClassIDs []int
 	TaughtScheduleIDs    []int
 }
 
 type AdminInfo struct {
 	UserInfo
+}
+
+func (u *UserInfo) GetRole() string {
+	return u.Role
+}
+
+func (u *UserInfo) GetID() int {
+	return u.ID
 }
 
 func (db *SQLHDb) FetchStudentInfo(ctx context.Context, userID int) (*StudentInfo, error) {

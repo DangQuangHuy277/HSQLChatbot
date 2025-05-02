@@ -33,7 +33,14 @@ type AuthorizationResult struct {
 	TargetList []*pgquery.Node
 }
 
+type AuthorizationContext struct {
+	AuthorizeColumn string
+	ExpectedValue   []int
+}
+
 type UserContext interface {
+	GetRole() string
+	GetID() int
 }
 
 // AuthorizeNode checks the authorization for a specific node in the SQL query.
@@ -262,7 +269,7 @@ func (s *AuthorizationService) authorizeJoinExpr(joinExpr *pgquery.JoinExpr, tab
 		if joinAlias := joinExpr.GetAlias(); joinAlias != nil {
 			curTables = s.createVirtualTableForAlias(joinAlias, nil, curTables)
 		}
-		if role == "admin" {
+		if userInfo.GetRole() == "admin" {
 			// TODO: Remove all unauthorized tables
 
 			return &AuthorizationResult{
@@ -371,7 +378,7 @@ func (s *AuthorizationService) authorizeRangeVar(node *pgquery.RangeVar, tables 
 	tables = s.MergeMaps(tables, om.NewOrderedMapWithElements(&om.Element[string, *TableInfoV2]{Key: table.Alias, Value: table}))
 
 	return &AuthorizationResult{
-		Authorized: isPublicTable(table.Name),
+		Authorized: isPublicTable(table.Name) || userInfo.GetRole() == "admin",
 		Tables:     tables,
 	}, nil
 }
@@ -498,13 +505,17 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 			// Loop through need to check tables to see which tables this expression can authorize
 			for _, table := range resultTables.AllFromFront() {
 				for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-					authColStrs := s.getAuthorizationColumn(table.Name, userInfo)
-					if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
-						s.getStringValueFromNode(columnRef.GetFields()[1]) == unauthorizedTable.getAliasOfColumn(authColStr) &&
-						int(aConst.GetIval().Ival) == id {
-						// Remove the table from the list of unauthorized tables
-						table.UnAuthorizedTables.Delete(unAuthAlias)
-						break
+					authContext := s.getAuthorizationColumn(table.Name, userInfo)
+
+					// Check if one of the ids is satisfied
+					for _, expectedID := range authContext.ExpectedValue {
+						if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
+							s.getStringValueFromNode(columnRef.GetFields()[1]) == unauthorizedTable.getAliasOfColumn(authContext.AuthorizeColumn) &&
+							int(aConst.GetIval().Ival) == expectedID {
+							// Remove the table from the list of unauthorized tables
+							table.UnAuthorizedTables.Delete(unAuthAlias)
+							break
+						}
 					}
 				}
 			}
@@ -525,7 +536,7 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 				if !ok {
 					continue
 				}
-				if s.getAuthorizationColumn(table.Name, role) != table.getAliasOfColumn(fields[1].GetString_().GetSval()) {
+				if s.getAuthorizationColumn(table.Name, userInfo).AuthorizeColumn != table.getAliasOfColumn(fields[1].GetString_().GetSval()) {
 					// We don't have the authorization column, so we can't authorize this table
 					continue
 				}
@@ -540,7 +551,7 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 		}
 	case pgquery.A_Expr_Kind_AEXPR_IN:
 		// Case: a IN (b, c, d)
-		// We only allow column IN (id) or id IN (column)
+		// We only allow authorizeColumn IN (id) or id IN (column)
 		if expr.GetLexpr().GetColumnRef() == nil || expr.GetRexpr().GetList() == nil || len(expr.GetRexpr().GetList().GetItems()) != 1 {
 			break
 		}
@@ -549,13 +560,15 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 
 		for _, table := range resultTables.AllFromFront() {
 			for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-				authColStr := s.getAuthorizationColumn(unauthorizedTable.Name, role)
-				if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
-					s.getStringValueFromNode(columnRef.GetFields()[1]) == unauthorizedTable.getAliasOfColumn(authColStr) &&
-					s.getStringValueFromNode(itemList[0]) == strconv.Itoa(id) {
-					// Remove the table from the list of unauthorized tables
-					table.UnAuthorizedTables.Delete(unAuthAlias)
-					break
+				authContext := s.getAuthorizationColumn(unauthorizedTable.Name, userInfo)
+				for _, id := range authContext.ExpectedValue {
+					if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
+						s.getStringValueFromNode(columnRef.GetFields()[1]) == unauthorizedTable.getAliasOfColumn(authContext.AuthorizeColumn) &&
+						s.getStringValueFromNode(itemList[0]) == strconv.Itoa(id) {
+						// Remove the table from the list of unauthorized tables
+						table.UnAuthorizedTables.Delete(unAuthAlias)
+						break
+					}
 				}
 			}
 		}
@@ -857,45 +870,83 @@ func (s *AuthorizationService) MergeMaps(dst, src *om.OrderedMap[string, *TableI
 // getAuthorizationColumn returns the column name used for authorization filtering
 // for a given table and role. Returns an empty string for public tables, admin role,
 // or when no specific authorization column applies.
-func (s *AuthorizationService) getAuthorizationColumn(name string, userInfo UserContext) []string {
+func (s *AuthorizationService) getAuthorizationColumn(name string, userInfo UserContext) AuthorizationContext {
 	// Admin role has unrestricted access to all tables
-	if role == "admin" {
-		return ""
+	if userInfo.GetRole() == "admin" {
+		return AuthorizationContext{}
 	}
 
 	// Public tables accessible to all roles
 	switch name {
 	case "program", "semester", "course", "course_program", "course_class",
 		"course_class_schedule", "course_schedule_instructor", "faculty":
-		return ""
+		return AuthorizationContext{}
 	}
 
 	// Role-specific authorization columns
-	switch role {
+	switch userInfo.GetRole() {
+
 	case "student":
+		studentInfo, ok := userInfo.(*StudentInfo)
+		if !ok {
+			return AuthorizationContext{}
+		}
 		switch name {
 		case "student":
-			return "id"
+			return AuthorizationContext{
+				AuthorizeColumn: "id", // Filter by student_id
+				ExpectedValue:   []int{studentInfo.ID},
+			} // Filter by student_id
 		case "administrative_class":
-			return "id" // Filter by student's administrative_class_id
+			return AuthorizationContext{
+				AuthorizeColumn: "id",
+				ExpectedValue:   []int{studentInfo.AdministrativeClassID},
+			}
 		case "student_course_class":
-			return "student_id"
+			return AuthorizationContext{
+				AuthorizeColumn: "student_id",
+				ExpectedValue:   []int{studentInfo.ID},
+			}
+		case "student_course_class_schedule":
+			return AuthorizationContext{
+				AuthorizeColumn: "student_id",
+				ExpectedValue:   []int{studentInfo.ID},
+			}
 		case "student_scholarship":
-			return "student_id"
+			return AuthorizationContext{
+				AuthorizeColumn: "student_id",
+				ExpectedValue:   []int{studentInfo.ID},
+			}
 		}
 	case "professor":
+		professorInfo, ok := userInfo.(*ProfessorInfo)
+		if !ok {
+			return AuthorizationContext{}
+		}
 		switch name {
 		case "professor":
-			return "id"
+			return AuthorizationContext{
+				AuthorizeColumn: "id", // Filter by professor_id
+				ExpectedValue:   []int{professorInfo.ID},
+			}
 		case "administrative_class":
-			return "advisor_id"
-		case "course_class":
-			return "professor_id"
-		case "course_schedule_instructor":
-			return "professor_id"
+			return AuthorizationContext{
+				AuthorizeColumn: "id",
+				ExpectedValue:   professorInfo.AdvisedClassIDs,
+			}
+		case "student_course_class":
+			return AuthorizationContext{
+				AuthorizeColumn: "id",
+				ExpectedValue:   professorInfo.TaughtCourseClassIDs,
+			}
+		case "student_course_class_schedule":
+			return AuthorizationContext{
+				AuthorizeColumn: "id",
+				ExpectedValue:   professorInfo.TaughtScheduleIDs,
+			}
 		}
 	}
 
 	// Default: No access for unspecified tables/roles
-	return ""
+	return AuthorizationContext{}
 }
