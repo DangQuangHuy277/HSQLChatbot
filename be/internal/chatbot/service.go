@@ -32,7 +32,7 @@ In case you don't find any relevant function, you generate a Postgres SQL to use
 You should not use any other function to retrieve data.
 Here is the database schema: %s
 
-User Id is %d, User role is %s.
+User ID is %d, User role is %s.
 Here is the user query: %s`
 )
 

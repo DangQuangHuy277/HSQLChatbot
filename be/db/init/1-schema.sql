@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS administrative_class
 --     FOREIGN KEY (advisor_id) REFERENCES professor (id)
 );
 
+-- Public: all
 CREATE TABLE IF NOT EXISTS semester
 (
     id   SERIAL PRIMARY KEY,
@@ -115,7 +116,7 @@ create table course_schedule_instructor
         primary key (course_class_schedule_id, professor_id)
 );
 
-
+-- Public: all
 CREATE TABLE IF NOT EXISTS program_semester_fee
 (
     id             SERIAL PRIMARY KEY,
