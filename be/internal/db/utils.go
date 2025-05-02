@@ -2,8 +2,8 @@ package db
 
 import om "github.com/elliotchance/orderedmap/v3"
 
-// DeepCopy creates a deep copy of an OrderedMap of TableInfoV2 pointers, ensuring the original is not modified.
-func DeepCopy(src *om.OrderedMap[string, *TableInfoV2]) *om.OrderedMap[string, *TableInfoV2] {
+// CloneUnAuthorizedTables creates a deep copy of an OrderedMap of TableInfoV2 pointers, ensuring the original is not modified.
+func CloneUnAuthorizedTables(src *om.OrderedMap[string, *TableInfoV2]) *om.OrderedMap[string, *TableInfoV2] {
 	if src == nil {
 		return nil
 	}

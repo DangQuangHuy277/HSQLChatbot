@@ -6,13 +6,16 @@ import (
 )
 
 type TableInfoV2 struct {
-	Name    string
+	Name string
+	// Columns is a map of alias to ColumnInfo
 	Columns *om.OrderedMap[string, *ColumnInfo]
 	Alias   string // To be reviewed
 	HasStar bool   // To be reviewed
 	// UnAuthorizedTables is a list of tables that are unauthorized inside this table, note that name of the table should be real name in the database
 	// UnAuthorizedTables is a map of alias to array of TableInfo
+	// UnAuthorizedTables is a map of alias to TableInfo
 	UnAuthorizedTables *om.OrderedMap[string, *TableInfoV2] // Consider use ordered map if needed
+	Authorized         bool
 	IsDatabase         bool
 }
 
@@ -28,7 +31,6 @@ func (t *TableInfoV2) createColumnFromSourceTable(colName string, sourceTable *T
 
 		t.Columns.Set(colAlias, &ColumnInfo{
 			Name:        colName,
-			Alias:       colAlias,
 			SourceTable: sourceTable,
 		})
 	}
@@ -77,22 +79,25 @@ func (t *TableInfoV2) createAllColumnsFromSourceTableList(sourceTable iter.Seq[*
 }
 
 func (t *TableInfoV2) getAliasOfColumn(str string) string {
-	for _, col := range t.Columns.AllFromFront() {
+	for alias, col := range t.Columns.AllFromFront() {
 		if col.SourceTable.IsDatabase {
 			if col.Name == str {
-				return col.Alias // or return col.Alias
+				return alias // or return col.Alias
 			}
 		} else {
 			// column come from a subquery
 			recurResult := col.SourceTable.getAliasOfColumn(str)
 			if recurResult != "" {
-				return recurResult
+				return alias
 			}
 		}
 	}
 	return ""
 }
 
+// Clone creates a deep copy of the TableInfoV2 instance.
+// But we will ignore the SourceTable field in ColumnInfo and the UnAuthorizedTables field in TableInfoV2.
+// Because these cause stack overflow when cloning.
 func (t *TableInfoV2) Clone() *TableInfoV2 {
 	if t == nil {
 		return nil
@@ -109,7 +114,7 @@ func (t *TableInfoV2) Clone() *TableInfoV2 {
 	if t.Columns != nil {
 		clone.Columns = om.NewOrderedMap[string, *ColumnInfo]()
 		for alias, col := range t.Columns.AllFromFront() {
-			clone.Columns.Set(alias, col.Clone())
+			clone.Columns.Set(alias, col.Clone(clone))
 		}
 	}
 
@@ -126,22 +131,24 @@ func (t *TableInfoV2) Clone() *TableInfoV2 {
 
 type ColumnInfo struct {
 	Name        string
-	Alias       string
 	SourceTable *TableInfoV2
 }
 
-func (c *ColumnInfo) Clone() *ColumnInfo {
+// Clone Create a copy of the ColumnInfo instance.
+// If sourceTable is nil, it will use the SourceTable field of the original instance.
+func (c *ColumnInfo) Clone(sourceTable *TableInfoV2) *ColumnInfo {
 	if c == nil {
 		return nil
 	}
 
 	clone := &ColumnInfo{
-		Name:  c.Name,
-		Alias: c.Alias,
+		Name: c.Name,
 	}
 
-	if c.SourceTable != nil {
-		clone.SourceTable = c.SourceTable.Clone()
+	if sourceTable != nil {
+		clone.SourceTable = sourceTable
+	} else {
+		clone.SourceTable = c.SourceTable
 	}
 
 	return clone
