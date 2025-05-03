@@ -114,7 +114,11 @@ func (t *TableInfoV2) Clone() *TableInfoV2 {
 	if t.Columns != nil {
 		clone.Columns = om.NewOrderedMap[string, *ColumnInfo]()
 		for alias, col := range t.Columns.AllFromFront() {
-			clone.Columns.Set(alias, col.Clone(clone))
+			if clone.IsDatabase {
+				clone.Columns.Set(alias, col.Clone(clone))
+			} else {
+				clone.Columns.Set(alias, col.Clone(nil))
+			}
 		}
 	}
 
@@ -132,26 +136,34 @@ func (t *TableInfoV2) Clone() *TableInfoV2 {
 // getRealColName returns the real column name for a given column alias.
 // If current table is virtual, it will resolve the column name by traversing the source tables.
 func (t *TableInfoV2) getRealColName(colAlias string) string {
+	resolvedCol := t.getRealColumnInfoFromAlias(colAlias)
+	if resolvedCol == nil {
+		return ""
+	}
+	return resolvedCol.Name
+}
+
+func (t *TableInfoV2) getRealColumnInfoFromAlias(colAlias string) *ColumnInfo {
 	curTable := t
 	// Find the real table
 	for curTable != nil && !curTable.IsDatabase {
 		resolvedCol, ok := curTable.Columns.Get(colAlias)
 		if !ok {
-			return ""
+			return nil
 		}
 		colAlias = resolvedCol.Name
 		curTable = resolvedCol.SourceTable
 	}
 
 	if curTable == nil {
-		return ""
+		return nil
 	}
 	resolvedCol, ok := curTable.Columns.Get(colAlias)
 	if !ok {
-		return ""
+		return nil
 	}
 
-	return resolvedCol.Name
+	return resolvedCol
 }
 
 type ColumnInfo struct {
@@ -160,7 +172,7 @@ type ColumnInfo struct {
 }
 
 // Clone Create a copy of the ColumnInfo instance.
-// If sourceTable is nil, it will use the SourceTable field of the original instance.
+// If sourceTable is nil, it will also clone the source table
 func (c *ColumnInfo) Clone(sourceTable *TableInfoV2) *ColumnInfo {
 	if c == nil {
 		return nil
@@ -173,7 +185,7 @@ func (c *ColumnInfo) Clone(sourceTable *TableInfoV2) *ColumnInfo {
 	if sourceTable != nil {
 		clone.SourceTable = sourceTable
 	} else {
-		clone.SourceTable = c.SourceTable
+		clone.SourceTable = c.SourceTable.Clone()
 	}
 
 	return clone

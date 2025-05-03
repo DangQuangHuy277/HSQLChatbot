@@ -5,7 +5,6 @@ import (
 	"fmt"
 	om "github.com/elliotchance/orderedmap/v3"
 	pgquery "github.com/pganalyze/pg_query_go/v6"
-	"strconv"
 	"strings"
 )
 
@@ -36,6 +35,7 @@ type AuthorizationResult struct {
 type AuthorizationContext struct {
 	AuthorizeColumn string
 	ExpectedValue   []int
+	Bypass          bool
 }
 
 type UserContext interface {
@@ -78,6 +78,8 @@ func (s *AuthorizationService) AuthorizeNode(node *pgquery.Node, tables *om.Orde
 		return s.authorizeJoinExpr(node.GetJoinExpr(), tables, neg, userInfo)
 	case *pgquery.Node_FromExpr:
 		return s.authorizeFromExpr(node.GetFromExpr(), tables, neg, userInfo)
+	case *pgquery.Node_RangeVar:
+		return s.authorizeRangeVar(node.GetRangeVar(), tables, userInfo)
 	case *pgquery.Node_Query:
 	case *pgquery.Node_ColumnRef:
 	case *pgquery.Node_AIndirection:
@@ -513,12 +515,15 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 					}
 				} else {
 					for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-						if s.isAuthorizedExpression(columnRef, aConst, unAuthAlias, unauthorizedTable, userInfo) {
+						if s.isAuthorizedExpression(columnRef, aConst, tableAlias, unauthorizedTable, userInfo) {
 							// Just too much careful, we also set the table to authorized
 							authorizedTable, _ := table.UnAuthorizedTables.Get(unAuthAlias)
 							authorizedTable.Authorized = true
 							// Remove the table from the list of unauthorized tables
 							table.UnAuthorizedTables.Delete(unAuthAlias)
+							if table.UnAuthorizedTables.Len() == 0 {
+								table.Authorized = true
+							}
 							break // small optimization
 						}
 					}
@@ -537,7 +542,7 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 				if len(fields) <= 1 || fields[0].GetString_() == nil || fields[1].GetString_() == nil {
 					continue
 				}
-				tableElement := tables.GetElement(fields[0].GetString_().GetSval())
+				tableElement := resultTables.GetElement(fields[0].GetString_().GetSval())
 				if tableElement == nil {
 					continue
 				}
@@ -547,24 +552,40 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 					continue
 				}
 
-				authContext := s.getAuthorizationColumn(tableElement.Value.Name, userInfo)
-
-				if tableElement.Value.getRealColName(fields[1].GetString_().GetSval()) != authContext.AuthorizeColumn {
-					// We don't have the authorization column, so we can't authorize this table
-					continue
-				}
-				authResult, _ := s.AuthorizeNode(expr.GetRexpr(), om.NewOrderedMapWithElements(tableElement), neg, userInfo)
-				// Check whether the subquery can authorize the table
-				if authResult.Authorized {
-					// Remove the table from the list of unauthorized tables
-					if tableElement.Value.IsDatabase {
-						tableElement.Value.Authorized = true
-					} else {
-						tableElement.Value.UnAuthorizedTables.Delete(tableElement.Key)
+				if tableElement.Value.IsDatabase {
+					authContext := s.getAuthorizationColumn(tableElement.Value.Name, userInfo)
+					if tableElement.Value.getRealColName(fields[1].GetString_().GetSval()) != authContext.AuthorizeColumn {
+						// We don't have the authorization column, so we can't authorize this table
+						continue
 					}
-					break
-				}
 
+					authResult, _ := s.AuthorizeNode(expr.GetRexpr(), om.NewOrderedMapWithElements(tableElement), neg, userInfo)
+					if authResult.Authorized {
+						tableElement.Value.Authorized = true
+					}
+				} else {
+					resolvedCol := tableElement.Value.getRealColumnInfoFromAlias(fields[1].GetString_().GetSval())
+					if resolvedCol == nil {
+						continue
+					}
+					authResult, _ := s.AuthorizeNode(expr.GetRexpr(), nil, neg, userInfo)
+					for _, table := range authResult.Tables.AllFromFront() {
+						if !table.IsDatabase {
+							// Don't support yet, to support in the future we need to have an extra field in TableInfoV2 to quick access all discovered tables
+							continue
+						}
+						if table.Name == resolvedCol.SourceTable.Name && table.Authorized {
+							// Too much careful
+							resolvedCol.SourceTable.Authorized = true
+							tableElement.Value.UnAuthorizedTables.Delete(table.Alias) // Can avoid table.Alias when support quick access field above
+							if tableElement.Value.UnAuthorizedTables.Len() == 0 {
+								tableElement.Value.Authorized = true
+							}
+							break
+						}
+					}
+
+				}
 			}
 		}
 	case pgquery.A_Expr_Kind_AEXPR_IN:
@@ -576,7 +597,7 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 		columnRef := expr.GetLexpr().GetColumnRef()
 		itemList := expr.GetRexpr().GetList().GetItems()
 
-		for _, table := range resultTables.AllFromFront() {
+		for tableAlias, table := range resultTables.AllFromFront() {
 			if table.IsDatabase {
 				if table.Authorized {
 					// If the table is authorized, we don't need to check it
@@ -587,26 +608,16 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 				}
 			} else {
 				for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-					if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), unAuthAlias, unauthorizedTable, userInfo) {
+					if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), tableAlias, unauthorizedTable, userInfo) {
 						// Just too much careful, we also set the table to authorized
 						authorizedTable, _ := table.UnAuthorizedTables.Get(unAuthAlias)
 						authorizedTable.Authorized = true
 						// Remove the table from the list of unauthorized tables
 						table.UnAuthorizedTables.Delete(unAuthAlias)
+						if table.UnAuthorizedTables.Len() == 0 {
+							table.Authorized = true
+						}
 						break // small optimization
-					}
-				}
-			}
-
-			for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-				authContext := s.getAuthorizationColumn(unauthorizedTable.Name, userInfo)
-				for _, id := range authContext.ExpectedValue {
-					if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
-						unauthorizedTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) == authContext.AuthorizeColumn &&
-						s.getStringValueFromNode(itemList[0]) == strconv.Itoa(id) {
-						// Remove the table from the list of unauthorized tables
-						table.UnAuthorizedTables.Delete(unAuthAlias)
-						break
 					}
 				}
 			}
@@ -616,7 +627,11 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 	// Build the result
 	authorized := true
 	for _, table := range resultTables.AllFromFront() {
-		authorized = authorized && table.UnAuthorizedTables.Len() == 0
+		if table.IsDatabase {
+			authorized = authorized && table.Authorized
+		} else {
+			authorized = authorized && table.UnAuthorizedTables.Len() == 0
+		}
 	}
 
 	return &AuthorizationResult{Authorized: authorized, Tables: resultTables}, nil
@@ -905,6 +920,9 @@ func (s *AuthorizationService) GetTablesException(tables1, tables2 []TableInfo) 
 // If dst is nil, it will be initialized
 // In case of duplicate keys, the value from src will overwrite the value in dst
 func (s *AuthorizationService) MergeMaps(dst, src *om.OrderedMap[string, *TableInfoV2]) *om.OrderedMap[string, *TableInfoV2] {
+	if dst == nil {
+		dst = om.NewOrderedMap[string, *TableInfoV2]()
+	}
 	for key, value := range src.AllFromFront() {
 		dst.Set(key, value)
 	}
@@ -914,9 +932,10 @@ func (s *AuthorizationService) MergeMaps(dst, src *om.OrderedMap[string, *TableI
 // isAuthorizedExpression checks if the given column reference and constant form an expression that authorizes the target table.
 func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnRef, aConst *pgquery.A_Const, targetTableAlias string, targetTable *TableInfoV2, userInfo UserContext) bool {
 	authContext := s.getAuthorizationColumn(targetTable.Name, userInfo)
-	return s.getStringValueFromNode(columnRef.GetFields()[0]) == targetTableAlias &&
-		authContext.AuthorizeColumn == targetTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) &&
-		containsInt(authContext.ExpectedValue, int(aConst.GetIval().Ival))
+	return authContext.Bypass ||
+		(s.getStringValueFromNode(columnRef.GetFields()[0]) == targetTableAlias &&
+			authContext.AuthorizeColumn == targetTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) &&
+			containsInt(authContext.ExpectedValue, int(aConst.GetIval().Ival)))
 }
 
 // getAuthorizationColumn returns the column name used for authorization filtering
@@ -925,14 +944,18 @@ func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnR
 func (s *AuthorizationService) getAuthorizationColumn(name string, userInfo UserContext) AuthorizationContext {
 	// Admin role has unrestricted access to all tables
 	if userInfo.GetRole() == "admin" {
-		return AuthorizationContext{}
+		return AuthorizationContext{
+			Bypass: true,
+		}
 	}
 
 	// Public tables accessible to all roles
 	switch name {
 	case "program", "semester", "course", "course_program", "course_class",
 		"course_class_schedule", "course_schedule_instructor", "faculty":
-		return AuthorizationContext{}
+		return AuthorizationContext{
+			Bypass: true,
+		}
 	}
 
 	// Role-specific authorization columns
