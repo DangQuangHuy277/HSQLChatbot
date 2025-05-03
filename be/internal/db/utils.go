@@ -14,3 +14,13 @@ func CloneUnAuthorizedTables(src *om.OrderedMap[string, *TableInfoV2]) *om.Order
 	}
 	return dst
 }
+
+// containsInt checks if a slice contains a specific integer value
+func containsInt(slice []int, val int) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}

@@ -129,6 +129,31 @@ func (t *TableInfoV2) Clone() *TableInfoV2 {
 	return clone
 }
 
+// getRealColName returns the real column name for a given column alias.
+// If current table is virtual, it will resolve the column name by traversing the source tables.
+func (t *TableInfoV2) getRealColName(colAlias string) string {
+	curTable := t
+	// Find the real table
+	for curTable != nil && !curTable.IsDatabase {
+		resolvedCol, ok := curTable.Columns.Get(colAlias)
+		if !ok {
+			return ""
+		}
+		colAlias = resolvedCol.Name
+		curTable = resolvedCol.SourceTable
+	}
+
+	if curTable == nil {
+		return ""
+	}
+	resolvedCol, ok := curTable.Columns.Get(colAlias)
+	if !ok {
+		return ""
+	}
+
+	return resolvedCol.Name
+}
+
 type ColumnInfo struct {
 	Name        string
 	SourceTable *TableInfoV2

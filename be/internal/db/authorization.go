@@ -542,17 +542,29 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 					continue
 				}
 				// Need to recheck this logic: when this is virtual table, we can't check naively like this
-				if s.getAuthorizationColumn(tableElement.Value.Name, userInfo).AuthorizeColumn != tableElement.Value.getAliasOfColumn(fields[1].GetString_().GetSval()) {
+				if tableElement.Value.Authorized {
+					// If the table is authorized, we don't need to check it
+					continue
+				}
+
+				authContext := s.getAuthorizationColumn(tableElement.Value.Name, userInfo)
+
+				if tableElement.Value.getRealColName(fields[1].GetString_().GetSval()) != authContext.AuthorizeColumn {
 					// We don't have the authorization column, so we can't authorize this table
 					continue
 				}
-				// Check whether the subquery can authorize the table
 				authResult, _ := s.AuthorizeNode(expr.GetRexpr(), om.NewOrderedMapWithElements(tableElement), neg, userInfo)
+				// Check whether the subquery can authorize the table
 				if authResult.Authorized {
 					// Remove the table from the list of unauthorized tables
-					tableElement.Value.UnAuthorizedTables.Delete(tableElement.Key)
+					if tableElement.Value.IsDatabase {
+						tableElement.Value.Authorized = true
+					} else {
+						tableElement.Value.UnAuthorizedTables.Delete(tableElement.Key)
+					}
 					break
 				}
+
 			}
 		}
 	case pgquery.A_Expr_Kind_AEXPR_IN:
@@ -590,7 +602,7 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 				authContext := s.getAuthorizationColumn(unauthorizedTable.Name, userInfo)
 				for _, id := range authContext.ExpectedValue {
 					if s.getStringValueFromNode(columnRef.GetFields()[0]) == table.Alias &&
-						s.getStringValueFromNode(columnRef.GetFields()[1]) == unauthorizedTable.getAliasOfColumn(authContext.AuthorizeColumn) &&
+						unauthorizedTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) == authContext.AuthorizeColumn &&
 						s.getStringValueFromNode(itemList[0]) == strconv.Itoa(id) {
 						// Remove the table from the list of unauthorized tables
 						table.UnAuthorizedTables.Delete(unAuthAlias)
@@ -900,16 +912,11 @@ func (s *AuthorizationService) MergeMaps(dst, src *om.OrderedMap[string, *TableI
 }
 
 // isAuthorizedExpression checks if the given column reference and constant form an expression that authorizes the target table.
-func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnRef, aConst *pgquery.A_Const, tableAlias string, targetTable *TableInfoV2, userInfo UserContext) bool {
+func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnRef, aConst *pgquery.A_Const, targetTableAlias string, targetTable *TableInfoV2, userInfo UserContext) bool {
 	authContext := s.getAuthorizationColumn(targetTable.Name, userInfo)
-	for _, expectedID := range authContext.ExpectedValue {
-		if s.getStringValueFromNode(columnRef.GetFields()[0]) == tableAlias &&
-			s.getStringValueFromNode(columnRef.GetFields()[1]) == targetTable.getAliasOfColumn(authContext.AuthorizeColumn) &&
-			int(aConst.GetIval().Ival) == expectedID {
-			return true
-		}
-	}
-	return false
+	return s.getStringValueFromNode(columnRef.GetFields()[0]) == targetTableAlias &&
+		authContext.AuthorizeColumn == targetTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) &&
+		containsInt(authContext.ExpectedValue, int(aConst.GetIval().Ival))
 }
 
 // getAuthorizationColumn returns the column name used for authorization filtering
