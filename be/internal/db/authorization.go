@@ -5,6 +5,7 @@ import (
 	"fmt"
 	om "github.com/elliotchance/orderedmap/v3"
 	pgquery "github.com/pganalyze/pg_query_go/v6"
+	"log"
 	"strings"
 )
 
@@ -424,7 +425,7 @@ func (s *AuthorizationService) authorizeBoolExpr(boolExpr *pgquery.BoolExpr, tab
 		// of all unauthorized tables for each subexpression
 		var authResultTables []*om.OrderedMap[string, *TableInfoV2]
 		for _, arg := range boolExpr.Args {
-			authResult, err := s.AuthorizeNode(arg, tables, neg, userInfo)
+			authResult, err := s.AuthorizeNode(arg, result.Tables, neg, userInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -436,7 +437,7 @@ func (s *AuthorizationService) authorizeBoolExpr(boolExpr *pgquery.BoolExpr, tab
 		// If intersection of unauthorized tables of all subexpressions is empty, then the whole expression is authorized
 		var authResultTables []*om.OrderedMap[string, *TableInfoV2]
 		for _, arg := range boolExpr.Args {
-			authResult, err := s.AuthorizeNode(arg, tables, neg, userInfo)
+			authResult, err := s.AuthorizeNode(arg, result.Tables, neg, userInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -450,17 +451,19 @@ func (s *AuthorizationService) authorizeBoolExpr(boolExpr *pgquery.BoolExpr, tab
 		if len(boolExpr.Args) != 1 {
 			return nil, fmt.Errorf("NOT expression must have exactly one argument")
 		}
-		authResult, err := s.AuthorizeNode(boolExpr.Args[0], tables, !neg, userInfo)
+		authResult, err := s.AuthorizeNode(boolExpr.Args[0], result.Tables, !neg, userInfo)
 		if err != nil {
 			return nil, err
 		}
-		result.Authorized = !authResult.Authorized
+		result.Authorized = authResult.Authorized
+		result.Tables = authResult.Tables
 	}
 
 	for _, table := range result.Tables.AllFromFront() {
-		if table.UnAuthorizedTables.Len() != 0 {
-			result.Authorized = false
-			break
+		if table.IsDatabase {
+			result.Authorized = result.Authorized && table.Authorized
+		} else {
+			result.Authorized = result.Authorized && table.UnAuthorizedTables.Len() == 0
 		}
 	}
 
@@ -504,18 +507,18 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 
 		if columnRef != nil && aConst != nil {
 			// Loop through need to check tables to see which tables this expression can authorize
-			for tableAlias, table := range resultTables.AllFromFront() {
+			for _, table := range resultTables.AllFromFront() {
 				if table.IsDatabase {
 					if table.Authorized {
 						// If the table is authorized, we don't need to check it
 						continue
 					}
-					if s.isAuthorizedExpression(columnRef, aConst, tableAlias, table, userInfo) {
+					if s.isAuthorizedExpression(columnRef, aConst, table, table, userInfo) {
 						table.Authorized = true
 					}
 				} else {
 					for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-						if s.isAuthorizedExpression(columnRef, aConst, tableAlias, unauthorizedTable, userInfo) {
+						if s.isAuthorizedExpression(columnRef, aConst, table, unauthorizedTable, userInfo) {
 							// Just too much careful, we also set the table to authorized
 							authorizedTable, _ := table.UnAuthorizedTables.Get(unAuthAlias)
 							authorizedTable.Authorized = true
@@ -597,18 +600,18 @@ func (s *AuthorizationService) authorizeAExpr(expr *pgquery.A_Expr, tables *om.O
 		columnRef := expr.GetLexpr().GetColumnRef()
 		itemList := expr.GetRexpr().GetList().GetItems()
 
-		for tableAlias, table := range resultTables.AllFromFront() {
+		for _, table := range resultTables.AllFromFront() {
 			if table.IsDatabase {
 				if table.Authorized {
 					// If the table is authorized, we don't need to check it
 					continue
 				}
-				if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), table.Alias, table, userInfo) {
+				if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), table, table, userInfo) {
 					table.Authorized = true
 				}
 			} else {
 				for unAuthAlias, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-					if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), tableAlias, unauthorizedTable, userInfo) {
+					if s.isAuthorizedExpression(columnRef, itemList[0].GetAConst(), table, unauthorizedTable, userInfo) {
 						// Just too much careful, we also set the table to authorized
 						authorizedTable, _ := table.UnAuthorizedTables.Get(unAuthAlias)
 						authorizedTable.Authorized = true
@@ -814,13 +817,24 @@ func (s *AuthorizationService) UpdateUnauthorizedTablesByUnion(dst *om.OrderedMa
 		tableUnAuth[table.Alias] = make(map[string]bool)
 	}
 
-	for _, tables := range tablesList {
-		for _, table := range tables.AllFromFront() {
+	for tableAlias, table := range dst.AllFromFront() {
+		for _, tables := range tablesList {
+			curTableEle := tables.GetElement(tableAlias)
+			if curTableEle == nil {
+				// This tablesList entry doesn't contain the table, this should never happen
+				log.Printf("Warning: table %s not found in tablesList", tableAlias)
+				continue
+			}
 			if table.IsDatabase {
-				tableUnAuth[table.Alias][table.Alias] = tableUnAuth[table.Alias][table.Alias] || !table.Authorized
+				tableUnAuth[tableAlias][curTableEle.Key] = tableUnAuth[tableAlias][curTableEle.Key] || !curTableEle.Value.Authorized
 			} else {
-				for _, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-					tableUnAuth[table.Alias][unauthorizedTable.Alias] = tableUnAuth[table.Alias][unauthorizedTable.Alias] || !unauthorizedTable.Authorized
+				for unAuthAlias, _ := range table.UnAuthorizedTables.AllFromFront() {
+					curUnauthorizedTable, ok := curTableEle.Value.UnAuthorizedTables.Get(unAuthAlias)
+					if !ok {
+						// This tablesList entry doesn't contain the unauthorized table, this mean it is authorized
+						continue
+					}
+					tableUnAuth[tableAlias][unAuthAlias] = tableUnAuth[tableAlias][unAuthAlias] || !curUnauthorizedTable.Authorized
 				}
 			}
 		}
@@ -846,6 +860,7 @@ func (s *AuthorizationService) UpdateUnauthorizedTablesByUnion(dst *om.OrderedMa
 }
 
 // UpdateUnauthorizedTablesByIntersection updates the unauthorized tables in the destination list
+// We only care about tableList data, but the dst should declare the boundaries of the tables (usually tables before transform to tablesList)
 func (s *AuthorizationService) UpdateUnauthorizedTablesByIntersection(dst *om.OrderedMap[string, *TableInfoV2], tablesList []*om.OrderedMap[string, *TableInfoV2]) {
 	// If intersection of unauthorized tables of all subexpressions is empty, then the whole expression is authorized
 	// Map table alias to a set of unauthorized table aliases (in go it is a map)
@@ -858,18 +873,27 @@ func (s *AuthorizationService) UpdateUnauthorizedTablesByIntersection(dst *om.Or
 		tableAuth[table.Alias] = make(map[string]bool)
 	}
 
-	for _, tables := range tablesList {
-		// The authorizeAExpr should already clean the authorized tables
-		// Keep track the unauthorized tables
-		for _, table := range tables.AllFromFront() {
+	for tableAlias, table := range dst.AllFromFront() {
+		for _, tables := range tablesList {
+			curTableEle := tables.GetElement(tableAlias)
+			if curTableEle == nil {
+				// This tablesList entry doesn't contain the table, this should never happen
+				log.Printf("Warning: table %s not found in tablesList", tableAlias)
+				continue
+			}
 			if table.IsDatabase {
-				tableAuth[table.Alias][table.Alias] = tableAuth[table.Alias][table.Alias] || table.Authorized
+				tableAuth[tableAlias][curTableEle.Key] = tableAuth[tableAlias][curTableEle.Key] || curTableEle.Value.Authorized
 			} else {
-				for _, unauthorizedTable := range table.UnAuthorizedTables.AllFromFront() {
-					tableAuth[table.Alias][unauthorizedTable.Alias] = tableAuth[table.Alias][unauthorizedTable.Alias] || unauthorizedTable.Authorized
+				for unAuthAlias, _ := range table.UnAuthorizedTables.AllFromFront() {
+					curUnauthorizedTable, ok := curTableEle.Value.UnAuthorizedTables.Get(unAuthAlias)
+					if !ok {
+						// This tablesList entry doesn't contain the unauthorized table, this mean it is authorized
+						tableAuth[tableAlias][unAuthAlias] = true
+						continue
+					}
+					tableAuth[tableAlias][unAuthAlias] = tableAuth[tableAlias][unAuthAlias] || curUnauthorizedTable.Authorized
 				}
 			}
-
 		}
 	}
 
@@ -959,11 +983,17 @@ func (s *AuthorizationService) MergeMaps(dst, src *om.OrderedMap[string, *TableI
 }
 
 // isAuthorizedExpression checks if the given column reference and constant form an expression that authorizes the target table.
-func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnRef, aConst *pgquery.A_Const, targetTableAlias string, targetTable *TableInfoV2, userInfo UserContext) bool {
-	authContext := s.getAuthorizationColumn(targetTable.Name, userInfo)
+func (s *AuthorizationService) isAuthorizedExpression(columnRef *pgquery.ColumnRef, aConst *pgquery.A_Const, targetTable *TableInfoV2, realUnAuthTable *TableInfoV2, userInfo UserContext) bool {
+	authContext := s.getAuthorizationColumn(realUnAuthTable.Name, userInfo)
+	columnInfo := targetTable.getRealColumnInfoFromAlias(s.getStringValueFromNode(columnRef.GetFields()[1]))
+	if columnInfo == nil || columnInfo.SourceTable == nil {
+		return authContext.Bypass
+	}
+
 	return authContext.Bypass ||
-		(s.getStringValueFromNode(columnRef.GetFields()[0]) == targetTableAlias &&
-			authContext.AuthorizeColumn == targetTable.getRealColName(s.getStringValueFromNode(columnRef.GetFields()[1])) &&
+		(s.getStringValueFromNode(columnRef.GetFields()[0]) == targetTable.Alias &&
+			columnInfo.SourceTable.Name == realUnAuthTable.Name &&
+			authContext.AuthorizeColumn == columnInfo.Name &&
 			containsInt(authContext.ExpectedValue, int(aConst.GetIval().Ival)))
 }
 
