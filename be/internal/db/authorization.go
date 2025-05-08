@@ -1036,7 +1036,7 @@ func (s *AuthorizationService) getAuthorizationColumn(name string, userInfo User
 				AuthorizeColumn: "id",
 				ExpectedValue:   []int{studentInfo.AdministrativeClassID},
 			}
-		case "student_course_class":
+		case "course_class_enrollment_id":
 			return AuthorizationContext{
 				AuthorizeColumn: "student_id",
 				ExpectedValue:   []int{studentInfo.ID},
@@ -1068,15 +1068,20 @@ func (s *AuthorizationService) getAuthorizationColumn(name string, userInfo User
 				AuthorizeColumn: "id",
 				ExpectedValue:   professorInfo.AdvisedClassIDs,
 			}
-		case "student_course_class":
+		case "course_class_enrollment_id":
 			return AuthorizationContext{
-				AuthorizeColumn: "id",
+				AuthorizeColumn: "course_class_id",
 				ExpectedValue:   professorInfo.TaughtCourseClassIDs,
 			}
 		case "student_course_class_schedule":
 			return AuthorizationContext{
 				AuthorizeColumn: "id",
 				ExpectedValue:   professorInfo.TaughtScheduleIDs,
+			}
+		case "student":
+			return AuthorizationContext{
+				AuthorizeColumn: "id",
+				ExpectedValue:   professorInfo.AdvisedStudentIDs,
 			}
 		}
 	}

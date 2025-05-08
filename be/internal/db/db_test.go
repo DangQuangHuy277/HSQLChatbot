@@ -351,7 +351,7 @@ func TestValidateQuery(t *testing.T) {
 		},
 		{
 			name:       "student accessing own course data with JOIN",
-			query:      "SELECT * FROM student_course_class scc JOIN student s ON scc.student_id = s.id WHERE s.id = 1",
+			query:      "SELECT * FROM course_class_enrollment scc JOIN student s ON scc.student_id = s.id WHERE s.id = 1",
 			userRole:   "student",
 			userId:     "1",
 			wantValid:  true,
@@ -359,7 +359,7 @@ func TestValidateQuery(t *testing.T) {
 		},
 		{
 			name:       "student accessing schedule with subquery",
-			query:      "SELECT * FROM course_class_schedule ccs WHERE ccs.course_class_id IN (SELECT cc.id FROM course_class cc JOIN student_course_class scc ON cc.id = scc.course_class_id JOIN student s ON scc.student_id = s.id WHERE s.id = 1)",
+			query:      "SELECT * FROM course_class_schedule ccs WHERE ccs.course_class_id IN (SELECT cc.id FROM course_class cc JOIN course_class_enrollment scc ON cc.id = scc.course_class_id JOIN student s ON scc.student_id = s.id WHERE s.id = 1)",
 			userRole:   "student",
 			userId:     "1",
 			wantValid:  true,
@@ -418,7 +418,7 @@ func TestValidateQuery(t *testing.T) {
 		},
 		{
 			name:       "complex query with multiple joins - student",
-			query:      "SELECT c.name, cc.code, ccs.day_of_week, ccs.lesson_range FROM course c JOIN course_class cc ON c.id = cc.course_id JOIN course_class_schedule ccs ON cc.id = ccs.course_class_id JOIN student_course_class scc ON cc.id = scc.course_class_id JOIN student s ON scc.student_id = s.id WHERE s.id = 1",
+			query:      "SELECT c.name, cc.code, ccs.day_of_week, ccs.lesson_range FROM course c JOIN course_class cc ON c.id = cc.course_id JOIN course_class_schedule ccs ON cc.id = ccs.course_class_id JOIN course_class_enrollment scc ON cc.id = scc.course_class_id JOIN student s ON scc.student_id = s.id WHERE s.id = 1",
 			userRole:   "student",
 			userId:     "1",
 			wantValid:  true,
@@ -428,7 +428,7 @@ func TestValidateQuery(t *testing.T) {
 			name: "student access with complex join conditions and complex ON clause",
 			query: `SELECT c.name, ccs.day_of_week
               FROM student s
-              JOIN student_course_class scc ON (scc.student_id = s.id AND s.id = 1) 
+              JOIN course_class_enrollment scc ON (scc.student_id = s.id AND s.id = 1) 
                  OR (s.id = 1 AND scc.enrollment_type = 'regular')
                  OR s.id IN (SELECT 1 WHERE TRUE)
               JOIN course_class cc ON cc.id = scc.course_class_id 
@@ -477,9 +477,9 @@ func TestValidateQuery(t *testing.T) {
 			name: "complex subquery in FROM clause",
 			query: `SELECT outer_query.* FROM 
                 (SELECT s.id, s.name, 
-                  (SELECT COUNT(*) FROM student_course_class scc 
+                  (SELECT COUNT(*) FROM course_class_enrollment scc 
                    WHERE scc.student_id = s.id) as course_count,
-                  (SELECT AVG(CAST(scc2.grade AS FLOAT)) FROM student_course_class scc2
+                  (SELECT AVG(CAST(scc2.grade AS FLOAT)) FROM course_class_enrollment scc2
                    WHERE scc2.student_id = s.id AND scc2.grade ~ '^[0-9]+(\.[0-9]+)?$') as avg_grade
                  FROM student s
                  WHERE s.id = 1) AS outer_query
@@ -499,7 +499,7 @@ func TestValidateQuery(t *testing.T) {
                        cc.code as course_code,
                        AVG(CAST(scc.grade AS FLOAT)) as average_grade,
                        COUNT(DISTINCT cc.id) as course_count
-                FROM student_course_class scc
+                FROM course_class_enrollment scc
                 JOIN course_class cc ON scc.course_class_id = cc.id
                 JOIN course c ON cc.course_id = c.id
                 GROUP BY scc.student_id, c.name, cc.code

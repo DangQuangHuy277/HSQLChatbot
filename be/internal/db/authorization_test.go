@@ -20,7 +20,7 @@ func (m *MockSchemaService) GetColumns(tableName string) []string {
 		return []string{"id", "code", "name", "english_name", "credits", "practice_hours", "theory_hours", "self_learn_hours", "prerequisite"}
 	case "administrative_class":
 		return []string{"id", "name", "program_id", "advisor_id"}
-	case "student_course_class":
+	case "course_class_enrollment":
 		return []string{"id", "student_id", "course_class_id", "grade"}
 	default:
 		return []string{}
@@ -623,7 +623,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("=")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment_id"), pgquery.MakeStrNode("student_id")}, 0),
 						pgquery.MakeAConstIntNode(2, 0),
 						0,
 					),
@@ -642,24 +642,24 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					studentTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: studentTbl})
 				}
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				return om.NewOrderedMapWithElements(
 					&om.Element[string, *TableInfoV2]{Key: "student", Value: studentTbl},
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
 			expectedAuth:      false,
-			expectedTableAuth: map[string]bool{"student": true, "student_course_class": false},
+			expectedTableAuth: map[string]bool{"student": true, "course_class_enrollment": false},
 		},
 		{
 			name: "OR expression with one condition authorized (student accessing own data or another's data)",
@@ -676,7 +676,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("=")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 						pgquery.MakeAConstIntNode(2, 0),
 						0,
 					),
@@ -695,24 +695,24 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					studentTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: studentTbl})
 				}
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				return om.NewOrderedMapWithElements(
 					&om.Element[string, *TableInfoV2]{Key: "student", Value: studentTbl},
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
 			expectedAuth:      false,
-			expectedTableAuth: map[string]bool{"student": false, "student_course_class": false},
+			expectedTableAuth: map[string]bool{"student": false, "course_class_enrollment": false},
 		},
 		{
 			name: "NOT expression with authorized condition",
@@ -755,7 +755,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("<>")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 						pgquery.MakeAConstIntNode(1, 0),
 						0,
 					),
@@ -764,21 +764,21 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 			),
 			tables: func() *om.OrderedMap[string, *TableInfoV2] {
 				tbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					tbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: tbl})
 				}
-				return om.NewOrderedMapWithElements(&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: tbl})
+				return om.NewOrderedMapWithElements(&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: tbl})
 			}(),
 			neg:               false,
 			userInfo:          &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
 			expectedAuth:      true,
-			expectedTableAuth: map[string]bool{"student_course_class": true},
+			expectedTableAuth: map[string]bool{"course_class_enrollment": true},
 		},
 		{
 			name: "Nested AND and OR expression with non-public table",
@@ -798,14 +798,14 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 							pgquery.MakeAExprNode(
 								pgquery.A_Expr_Kind_AEXPR_OP,
 								[]*pgquery.Node{pgquery.MakeStrNode("=")},
-								pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+								pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 								pgquery.MakeAConstIntNode(1, 0),
 								0,
 							),
 							pgquery.MakeAExprNode(
 								pgquery.A_Expr_Kind_AEXPR_OP,
 								[]*pgquery.Node{pgquery.MakeStrNode("=")},
-								pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+								pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 								pgquery.MakeAConstIntNode(2, 0),
 								0,
 							),
@@ -827,24 +827,24 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					studentTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: studentTbl})
 				}
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				return om.NewOrderedMapWithElements(
 					&om.Element[string, *TableInfoV2]{Key: "student", Value: studentTbl},
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
 			expectedAuth:      false,
-			expectedTableAuth: map[string]bool{"student": true, "student_course_class": false},
+			expectedTableAuth: map[string]bool{"student": true, "course_class_enrollment": false},
 		},
 		{
 			name: "Virtual table in AND expression",
@@ -954,7 +954,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("=")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("id")}, 0),
 						pgquery.MakeAConstIntNode(10, 0),
 						0,
 					),
@@ -970,13 +970,13 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 			),
 			tables: func() *om.OrderedMap[string, *TableInfoV2] {
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				courseTbl := &TableInfoV2{
@@ -990,14 +990,14 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					courseTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: courseTbl})
 				}
 				return om.NewOrderedMapWithElements(
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 					&om.Element[string, *TableInfoV2]{Key: "course", Value: courseTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &ProfessorInfo{UserInfo: UserInfo{ID: 1, Role: "professor"}, TaughtCourseClassIDs: []int{10}},
 			expectedAuth:      true,
-			expectedTableAuth: map[string]bool{"student_course_class": true, "course": true},
+			expectedTableAuth: map[string]bool{"course_class_enrollment": true, "course": true},
 		},
 		{
 			name: "Admin accessing all tables",
@@ -1014,7 +1014,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("=")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 						pgquery.MakeAConstIntNode(2, 0),
 						0,
 					),
@@ -1033,24 +1033,24 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					studentTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: studentTbl})
 				}
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				return om.NewOrderedMapWithElements(
 					&om.Element[string, *TableInfoV2]{Key: "student", Value: studentTbl},
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &UserInfo{ID: 1, Role: "admin"},
 			expectedAuth:      true,
-			expectedTableAuth: map[string]bool{"student": true, "student_course_class": true},
+			expectedTableAuth: map[string]bool{"student": true, "course_class_enrollment": true},
 		},
 		{
 			name: "Student accessing unauthorized administrative class",
@@ -1272,7 +1272,7 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					pgquery.MakeAExprNode(
 						pgquery.A_Expr_Kind_AEXPR_OP,
 						[]*pgquery.Node{pgquery.MakeStrNode("=")},
-						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("student_course_class"), pgquery.MakeStrNode("student_id")}, 0),
+						pgquery.MakeColumnRefNode([]*pgquery.Node{pgquery.MakeStrNode("course_class_enrollment"), pgquery.MakeStrNode("student_id")}, 0),
 						pgquery.MakeAConstIntNode(1, 0),
 						0,
 					),
@@ -1304,24 +1304,24 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 				virtualTbl.Columns.Set("student_id", &ColumnInfo{Name: "id", SourceTable: studentTbl})
 				// Student course class table
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-					Alias:      "student_course_class",
+					Alias:      "course_class_enrollment",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				return om.NewOrderedMapWithElements(
 					&om.Element[string, *TableInfoV2]{Key: "subquery", Value: virtualTbl},
-					&om.Element[string, *TableInfoV2]{Key: "student_course_class", Value: sccTbl},
+					&om.Element[string, *TableInfoV2]{Key: "course_class_enrollment", Value: sccTbl},
 				)
 			}(),
 			neg:               false,
 			userInfo:          &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
 			expectedAuth:      false,
-			expectedTableAuth: map[string]bool{"subquery": false, "student_course_class": true},
+			expectedTableAuth: map[string]bool{"subquery": false, "course_class_enrollment": true},
 		},
 		{
 			name: "Virtual table with nested NOT and authorized professor access",
@@ -1352,15 +1352,15 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 				0,
 			),
 			tables: func() *om.OrderedMap[string, *TableInfoV2] {
-				// Inner student_course_class table
+				// Inner course_class_enrollment table
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
 					Alias:      "scc",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				// Virtual table for subquery
@@ -1407,15 +1407,15 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 				0,
 			),
 			tables: func() *om.OrderedMap[string, *TableInfoV2] {
-				// Inner student_course_class table
+				// Inner course_class_enrollment table
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
 					Alias:      "scc",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				// Virtual table for subquery
@@ -1473,13 +1473,13 @@ func TestAuthorizeBoolExpr(t *testing.T) {
 					studentTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: studentTbl})
 				}
 				sccTbl := &TableInfoV2{
-					Name:       "student_course_class",
+					Name:       "course_class_enrollment",
 					Columns:    om.NewOrderedMap[string, *ColumnInfo](),
 					Alias:      "scc",
 					Authorized: false,
 					IsDatabase: true,
 				}
-				for _, col := range schemaService.GetColumns("student_course_class") {
+				for _, col := range schemaService.GetColumns("course_class_enrollment") {
 					sccTbl.Columns.Set(col, &ColumnInfo{Name: col, SourceTable: sccTbl})
 				}
 				studentVirtual := &TableInfoV2{
@@ -3003,52 +3003,52 @@ func TestIsAuthorizedExpression(t *testing.T) {
 		{
 			name: "Professor accessing taught course class",
 			columnRef: pgquery.MakeColumnRefNode([]*pgquery.Node{
-				pgquery.MakeStrNode("student_course_class"),
+				pgquery.MakeStrNode("course_class_enrollment"),
 				pgquery.MakeStrNode("id"),
 			}, 0).GetColumnRef(),
 			aConst: pgquery.MakeAConstIntNode(1, 0).GetAConst(),
 			targetTable: &TableInfoV2{
-				Name: "student_course_class",
+				Name: "course_class_enrollment",
 				Columns: om.NewOrderedMapWithElements(
 					&om.Element[string, *ColumnInfo]{
 						Key:   "id",
-						Value: &ColumnInfo{Name: "id", SourceTable: &TableInfoV2{Name: "student_course_class"}},
+						Value: &ColumnInfo{Name: "id", SourceTable: &TableInfoV2{Name: "course_class_enrollment"}},
 					},
 				),
-				Alias:      "student_course_class",
+				Alias:      "course_class_enrollment",
 				IsDatabase: true,
 			},
 			realUnAuthTable: &TableInfoV2{
-				Name:       "student_course_class",
+				Name:       "course_class_enrollment",
 				Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-				Alias:      "student_course_class",
+				Alias:      "course_class_enrollment",
 				IsDatabase: true,
 			},
 			userInfo: &ProfessorInfo{UserInfo: UserInfo{ID: 1, Role: "professor"}, TaughtCourseClassIDs: []int{1}},
 			expected: true,
 		},
 		{
-			name: "Column name conflict across tables - student_id in student vs student_course_class",
+			name: "Column name conflict across tables - student_id in student vs course_class_enrollment",
 			columnRef: pgquery.MakeColumnRefNode([]*pgquery.Node{
-				pgquery.MakeStrNode("student_course_class"),
+				pgquery.MakeStrNode("course_class_enrollment"),
 				pgquery.MakeStrNode("student_id"),
 			}, 0).GetColumnRef(),
 			aConst: pgquery.MakeAConstIntNode(1, 0).GetAConst(),
 			targetTable: &TableInfoV2{
-				Name: "student_course_class",
+				Name: "course_class_enrollment",
 				Columns: om.NewOrderedMapWithElements(
 					&om.Element[string, *ColumnInfo]{
 						Key:   "student_id",
-						Value: &ColumnInfo{Name: "student_id", SourceTable: &TableInfoV2{Name: "student_course_class"}},
+						Value: &ColumnInfo{Name: "student_id", SourceTable: &TableInfoV2{Name: "course_class_enrollment"}},
 					},
 				),
-				Alias:      "student_course_class",
+				Alias:      "course_class_enrollment",
 				IsDatabase: true,
 			},
 			realUnAuthTable: &TableInfoV2{
-				Name:       "student_course_class",
+				Name:       "course_class_enrollment",
 				Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-				Alias:      "student_course_class",
+				Alias:      "course_class_enrollment",
 				IsDatabase: true,
 			},
 			userInfo: &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},
@@ -3073,9 +3073,9 @@ func TestIsAuthorizedExpression(t *testing.T) {
 				IsDatabase: true,
 			},
 			realUnAuthTable: &TableInfoV2{
-				Name:       "student_course_class",
+				Name:       "course_class_enrollment",
 				Columns:    om.NewOrderedMap[string, *ColumnInfo](),
-				Alias:      "student_course_class",
+				Alias:      "course_class_enrollment",
 				IsDatabase: true,
 			},
 			userInfo: &StudentInfo{UserInfo: UserInfo{ID: 1, Role: "student"}},

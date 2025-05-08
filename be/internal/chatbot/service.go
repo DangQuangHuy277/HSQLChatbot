@@ -246,7 +246,7 @@ func (cs *ChatService) StreamChatResponse(ctx context.Context, req ChatRequest, 
 	rolePrompt := ""
 	switch role {
 	case "student":
-		rolePrompt = fmt.Sprintf("The user is a student with ID %d, so your query should only access data for their personal info, courses, administrative class and corresponding advisor, grades, etc. The filter should include something like 'student.id = %d' or 'student_course_class.student_id = %d' to specify only data related to them, except data about program, course, and course_class is general.", userId, userId, userId)
+		rolePrompt = fmt.Sprintf("The user is a student with ID %d, so your query should only access data for their personal info, courses, administrative class and corresponding advisor, grades, etc. The filter should include something like 'student.id = %d' or 'course_class_enrollment_id.student_id = %d' to specify only data related to them, except data about program, course, and course_class is general.", userId, userId, userId)
 	case "professor":
 		rolePrompt = fmt.Sprintf("The user is a professor with ID %d, so your query should only access data for their personal info, courses they teach, corresponding students and grades, schedules, etc. The filter should include something like 'course_class.professor_id = %d' or 'course_schedule_instructor.professor_id = %d' to specify only data related to them, except data about program, course, and student is general.", userId, userId, userId)
 	case "admin":

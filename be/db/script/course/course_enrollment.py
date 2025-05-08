@@ -187,20 +187,20 @@ def store_data_in_db(conn, data, semester_id):
 
             # 6. Link student to course class
             cursor.execute("""
-                INSERT INTO student_course_class (student_id, course_class_id, enrollment_type)
+                INSERT INTO course_class_enrollment (student_id, course_class_id, enrollment_type)
                 VALUES (%s, %s, %s)
                 ON CONFLICT(student_id, course_class_id) DO UPDATE SET enrollment_type = EXCLUDED.enrollment_type
                 RETURNING id;
             """, (student_id, course_class_id, item["enrollment_type"]))
-            student_course_class_id = cursor.fetchone()[0]
+            course_class_enrollment_id = cursor.fetchone()[0]
 
             # 7. Link student to course class schedule
             for course_class_schedule_id in course_class_schedule_ids:
                 cursor.execute("""
-                    INSERT INTO student_course_class_schedule (student_course_class_id, course_class_schedule_id)
+                    INSERT INTO student_course_class_schedule (course_class_enrollment_id, course_class_schedule_id)
                     VALUES (%s, %s)
                     ON CONFLICT DO NOTHING;
-                """, (student_course_class_id, course_class_schedule_id))
+                """, (course_class_enrollment_id, course_class_schedule_id))
 
         processed_count += 1
 

@@ -115,41 +115,6 @@ create table course_schedule_instructor
         primary key (course_class_schedule_id, professor_id)
 );
 
--- Public: all
-CREATE TABLE IF NOT EXISTS program_semester_fee
-(
-    id             SERIAL PRIMARY KEY,
-    program_id     INT,                                                       -- Foreign key to the program
-    semester_id    INT,                                                       -- Foreign key to the semester
-    fee_type       VARCHAR(20) CHECK ( fee_type IN ('PER_CREDIT', 'FIXED') ), -- 'PER_CREDIT' or 'FIXED'
-    fee_per_credit NUMERIC(10, 2),                                            -- Fee per credit (nullable if fee_type = 'FIXED')
-    fixed_fee      NUMERIC(10, 2)                                             -- Fixed fee for the semester (nullable if fee_type = 'PER_CREDIT')
---     FOREIGN KEY (program_id) REFERENCES program (id),
---     FOREIGN KEY (semester_id) REFERENCES semester (id)
-);
-
-CREATE TABLE IF NOT EXISTS scholarship
-(
-    id                   SERIAL PRIMARY KEY,                                                                  -- Unique ID for the scholarship
-    name                 VARCHAR(100),                                                                        -- Scholarship name
-    description          TEXT,                                                                                -- Description
-    type                 VARCHAR(20) CHECK (type IN ('ACADEMIC', 'CORPORATE')),                               -- Scholarship type
-    subtype              VARCHAR(20) CHECK (subtype IN ('EXCELLENT', 'GOOD')),                                -- Scholarship subtype (only for academic type)
-    period_unit          VARCHAR(20) CHECK (period_unit IN ('SEMESTER', 'ACADEMIC_YEAR')) DEFAULT 'SEMESTER', -- Period unit
-    amount               NUMERIC(10, 2),                                                                      -- Scholarship amount
-    is_recurring         BOOLEAN                                                          DEFAULT FALSE,      -- Indicates whether the scholarship is recurring
-    sponsor_name         VARCHAR(100),                                                                        -- Sponsor name (for corporate scholarships)
-    eligibility_criteria TEXT                                                                                 -- Eligibility criteria (optional)
-);
-
-CREATE TABLE IF NOT EXISTS student_scholarship
-(
-    id             SERIAL PRIMARY KEY, -- Unique ID for the student-scholarship association
-    student_id     INT,                -- Foreign key to the student table
-    scholarship_id INT                 -- Foreign key to the scholarship table
---     FOREIGN KEY (student_id) REFERENCES student (id) ON DELETE CASCADE,        -- Cascade deletion when student is deleted
---     FOREIGN KEY (scholarship_id) REFERENCES scholarship (id) ON DELETE CASCADE -- Cascade deletion when scholarship is deleted
-);
 
 -- Each student can only access their own data
 CREATE TABLE IF NOT EXISTS student
@@ -166,7 +131,7 @@ CREATE TABLE IF NOT EXISTS student
 );
 
 -- User can view data of students in the same class
-CREATE TABLE IF NOT EXISTS student_course_class
+CREATE TABLE IF NOT EXISTS course_class_enrollment
 (
     id              SERIAL PRIMARY KEY,   -- Added id
     student_id      INT NOT NULL,
@@ -182,10 +147,10 @@ CREATE TABLE IF NOT EXISTS student_course_class
 CREATE TABLE IF NOT EXISTS student_course_class_schedule
 (
     id                       SERIAL PRIMARY KEY,                -- Added id
-    student_course_class_id  INT NOT NULL,
+    course_class_enrollment_id  INT NOT NULL,
     course_class_schedule_id INT NOT NULL,
-    UNIQUE (student_course_class_id, course_class_schedule_id) -- Keep the unique constraint
---     FOREIGN KEY (student_course_class_id) REFERENCES student_course_class (id),
+    UNIQUE (course_class_enrollment_id, course_class_schedule_id) -- Keep the unique constraint
+--     FOREIGN KEY (course_class_enrollment_id) REFERENCES student_course_class (id),
 --     FOREIGN KEY (course_class_schedule_id) REFERENCES course_class_schedule (id)
 );
 

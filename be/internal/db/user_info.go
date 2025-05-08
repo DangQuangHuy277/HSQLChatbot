@@ -23,6 +23,7 @@ type ProfessorInfo struct {
 	AdvisedClassIDs      []int
 	TaughtCourseClassIDs []int
 	TaughtScheduleIDs    []int
+	AdvisedStudentIDs    []int
 }
 
 type AdminInfo struct {
@@ -56,7 +57,7 @@ func (db *SQLHDb) FetchStudentInfo(ctx context.Context, userID int) (*StudentInf
 		// Query for course class IDs only
 		defer wg.Done()
 		err := db.SelectContext(ctx, &info.EnrolledCourseClassIDs,
-			`SELECT id FROM student_course_class WHERE student_id = $1`, userID)
+			`SELECT id FROM course_class_enrollment WHERE student_id = $1`, userID)
 		if err != nil {
 			log.Println("Error fetching enrolled course class IDs:", err)
 			return
@@ -69,7 +70,7 @@ func (db *SQLHDb) FetchStudentInfo(ctx context.Context, userID int) (*StudentInf
 		err := db.SelectContext(ctx, &info.EnrolledScheduleIDs,
 			`SELECT sccs.id
          FROM student_course_class_schedule sccs
-         JOIN student_course_class scc ON sccs.student_course_class_id = scc.id and scc.student_id = $1`, userID)
+         JOIN course_class_enrollment scc ON sccs.course_class_enrollment_id = scc.id and scc.student_id = $1`, userID)
 		if err != nil {
 			log.Println("Error fetching enrolled schedule IDs:", err)
 			return
@@ -87,7 +88,7 @@ func (db *SQLHDb) FetchProfessorInfo(ctx context.Context, userID int) (*Professo
 	info.UserInfo.Role = "professor"
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		err := db.SelectContext(ctx, &info.AdvisedClassIDs, "select id from administrative_class where advisor_id = $1", userID)
@@ -120,6 +121,19 @@ func (db *SQLHDb) FetchProfessorInfo(ctx context.Context, userID int) (*Professo
 			where csi.professor_id = $1`, userID)
 		if err != nil {
 			log.Println("Error fetching taught schedule IDs:", err)
+			return
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := db.SelectContext(ctx, &info.AdvisedStudentIDs,
+			`select s.id
+			from student s
+			inner join administrative_class ac on s.administrative_class_id = ac.id
+			where ac.advisor_id = $1`, userID)
+		if err != nil {
+			log.Println("Error fetching advised student IDs:", err)
 			return
 		}
 	}()
