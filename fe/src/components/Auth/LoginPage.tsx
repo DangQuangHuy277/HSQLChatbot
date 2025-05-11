@@ -11,9 +11,8 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-    //   const res = await axios.post('/auth/login', { username, password });
-    const res = "abctoken"
-      login(res);
+      const res = await axios.post('http://127.0.0.1:8080/api/v1/login', { username, password });
+      login(res.data.token);
     } catch (error) {
       console.error(error);
     }
