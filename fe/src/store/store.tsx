@@ -123,6 +123,9 @@ export interface AuthType {
     setUser: (user: { name: string; email: string; avatar: string }) => void;
     setApiKey: (apikey: string) => void;
     user: UserType;
+    accessToken: string;
+    logout: () => void;
+    login: (token: string) => void;
 }
 
 // (set, get) => ({}) is createState callback of create, set and get is internal function of zustand
@@ -261,6 +264,7 @@ const useAuth = create<AuthType>()(
                 email: "",
                 avatar: "/imgs/default-avatar.jpg",
             },
+            accessToken: localStorage.getItem("accessToken") || "",
             setToken: (token) => {
                 set(
                     produce((state) => {
@@ -283,6 +287,22 @@ const useAuth = create<AuthType>()(
                 );
                 localStorage.setItem("apikey", apikey);
             },
+            logout: () => {
+                set(
+                    produce((state) => {
+                        state.accessToken = "";
+                    })
+                );
+                localStorage.removeItem("access_token");
+            },
+            login: (token) => {
+                set(
+                    produce((state) => {
+                        state.accessToken = token;
+                    })
+                );
+                localStorage.setItem("token", token);
+            }
         }),
         {
             name: "auth",

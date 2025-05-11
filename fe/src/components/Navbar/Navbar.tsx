@@ -8,6 +8,8 @@ import {
   settingsOutline,
   ellipsisHorizontalOutline,
   closeOutline,
+  logOut,
+  logOutOutline,
 } from "ionicons/icons";
 import useChat, { ModalList, useAuth, useSettings } from "../../store/store";
 import Settings from "../modals/Settings";
@@ -50,6 +52,7 @@ export default function Navbar({
     },
     {}
   );
+  const { logout } = useAuth();
 
   return (
     <>
@@ -124,6 +127,15 @@ export default function Navbar({
               </button>
               <div className="options absolute bottom-12 rounded-md left-0 right-0 bg-gray-800 font-normal invisible transition  m-2 z-30 text-gray-300 ">
                 <button
+                  className=" p-2   hover:bg-gray-700 w-full text-left flex items-center text-red-600"
+                  onClick={() => logout()}
+                >
+                  <span className="mr-2 p-1 text-xl  flex items-center">
+                    <IonIcon icon={logOutOutline} />
+                  </span>
+                  <span>Logout</span>
+                </button>
+                <button
                   className=" p-2   hover:bg-gray-700 w-full text-left flex items-center"
                   onClick={() => setSystemMessageModalVisible(true)}
                 >
@@ -163,6 +175,7 @@ export default function Navbar({
           </button>
         </nav>
       </div>
+  
       <Modal visible={isVisible}>
         <Settings />
       </Modal>

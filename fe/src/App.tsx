@@ -11,13 +11,14 @@ import classNames from "classnames";
 import Chats from "./components/Chat/Chats";
 import Modal from "./components/modals/Modal";
 import Apikey from "./components/modals/Apikey";
+import LoginPage from "./components/Auth/LoginPage";
 
 setupIonicReact();
 function App() {
   const [active, setActive] = useState(false);
   const isChatsVisible = useChat(chatsLength);
   const addNewChat = useChat((state) => state.addNewChat);
-  const userHasApiKey = useAuth((state) => state.apikey);
+  const loggedIn = useAuth((state) => state.accessToken !== "");
   const [theme] = useTheme((state) => [state.theme]);
 
   useEffect(() => {
@@ -29,7 +30,10 @@ function App() {
   }, [theme]);
 
   return (
-    <div className="App  font-montserrat md:flex ">
+    <>
+      <div className="App  font-montserrat md:flex ">
+    {loggedIn ? (
+      <>
       <Navbar active={active} setActive={setActive} />
       <div className="">
         <button
@@ -81,7 +85,13 @@ function App() {
           </div>
         </div>
       </main>
+      </>
+    ): (
+      <LoginPage />
+    )}
     </div>
+    
+    </>
   );
 }
 
