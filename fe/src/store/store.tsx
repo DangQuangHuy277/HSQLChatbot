@@ -86,6 +86,8 @@ export interface SettingsType {
     modalsList: readonly string[];
     isSystemMessageModalVisible: boolean;
     isModalVisible: boolean;
+    isConfirmLogoutVisible: boolean;
+    setConfirmLogout: (value: boolean) => void;
     setSystemMessage: (value: SystemMessageType) => void;
     setSystemMessageModalVisible: (value: boolean) => void;
     setSendChatHistory: (value: boolean) => void;
@@ -264,7 +266,7 @@ const useAuth = create<AuthType>()(
                 email: "",
                 avatar: "/imgs/default-avatar.jpg",
             },
-            accessToken: localStorage.getItem("accessToken") || "",
+            accessToken: localStorage.getItem("access_token") || "",
             setToken: (token) => {
                 set(
                     produce((state) => {
@@ -301,7 +303,7 @@ const useAuth = create<AuthType>()(
                         state.accessToken = token;
                     })
                 );
-                localStorage.setItem("token", token);
+                localStorage.setItem("access_token", token);
             }
         }),
         {
@@ -324,6 +326,14 @@ const useSettings = createWithEqualityFn<SettingsType>()(
             modalsList: modalsList,
             isSystemMessageModalVisible: false,
             isModalVisible: false,
+            isConfirmLogoutVisible: false,
+            setConfirmLogout: (value) => {
+                set(
+                    produce((state: SettingsType) => {
+                        state.isConfirmLogoutVisible = value;
+                    })
+                );
+            },
             setSystemMessage: (value) => {
                 set(
                     produce((state: SettingsType) => {

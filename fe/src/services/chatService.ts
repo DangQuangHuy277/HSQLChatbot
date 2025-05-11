@@ -42,7 +42,7 @@ export async function fetchResults(
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "text/event-stream",
-                "Authorization": `Bearer ${localStorage.getItem("token")}` // Using token instead of API key
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}` // Using token instead of API key
             },
             body: JSON.stringify(requestBody)
         });

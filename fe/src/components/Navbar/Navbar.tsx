@@ -15,6 +15,7 @@ import useChat, { ModalList, useAuth, useSettings } from "../../store/store";
 import Settings from "../modals/Settings";
 import Modal from "../modals/Modal";
 import SystemMessage from "../modals/SystemMessage";
+import ConfirmLogout from "../modals/ConfirmLogout";
 
 export default function Navbar({
   active,
@@ -32,6 +33,8 @@ export default function Navbar({
     selectedModal,
     modalsList,
     setModal,
+    isConfirmLogoutVisible,
+    setConfirmLogoutVisible,
   ] = useSettings((state) => [
     state.isModalVisible,
     state.setModalVisible,
@@ -40,6 +43,8 @@ export default function Navbar({
     state.settings.selectedModal,
     state.modalsList,
     state.setModal,
+    state.isConfirmLogoutVisible,
+    state.setConfirmLogout,
   ]);
   const name = useAuth((state) => state.user.name);
   const groupedModels = modalsList.reduce(
@@ -52,7 +57,7 @@ export default function Navbar({
     },
     {}
   );
-  const { logout } = useAuth();
+  
 
   return (
     <>
@@ -128,7 +133,7 @@ export default function Navbar({
               <div className="options absolute bottom-12 rounded-md left-0 right-0 bg-gray-800 font-normal invisible transition  m-2 z-30 text-gray-300 ">
                 <button
                   className=" p-2   hover:bg-gray-700 w-full text-left flex items-center text-red-600"
-                  onClick={() => logout()}
+                  onClick={() => setConfirmLogoutVisible(true)}
                 >
                   <span className="mr-2 p-1 text-xl  flex items-center">
                     <IonIcon icon={logOutOutline} />
@@ -175,7 +180,9 @@ export default function Navbar({
           </button>
         </nav>
       </div>
-  
+        <Modal visible={isConfirmLogoutVisible}>
+          <ConfirmLogout />
+        </Modal>
       <Modal visible={isVisible}>
         <Settings />
       </Modal>
