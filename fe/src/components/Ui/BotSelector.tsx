@@ -23,7 +23,7 @@ export default function BotSelector() {
         {
             id: "general",
             name: "General Assistant",
-            description: "General purpose chat assistant",
+            description: "General purpose chat bot",
             icon: chatbubbleOutline
         },
         {

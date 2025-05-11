@@ -20,6 +20,8 @@ const modalsList = [
     "dall-e-2",
 ] as const;
 
+const BASE_API_URL = "http://127.0.0.1:8080/api/v1";
+
 const agentsList = [
     "general",
     "article",
@@ -27,9 +29,8 @@ const agentsList = [
 ]
 
 export interface ChatMessageType {
-    role: "user" | "assistant" | "system";
+    role: "user" | "bot";
     content: string;
-    type: "text" | "image_url";
     id: string;
 }
 
@@ -100,7 +101,10 @@ export interface SettingsType {
 
 export interface ChatType {
     chats: ChatMessageType[];
-    chatHistory: string[];
+    chatHistory: string[]; // contain all conversation ids
+    conversations: any[]; // contain all conversations info
+    currentConversation: string;
+    initChatHistory: () => void;
     addChat: (chat: ChatMessageType, index?: number) => void;
     editChatMessage: (chat: string, updateIndex: number) => void;
     addNewChat: () => void;
@@ -133,10 +137,29 @@ export interface AuthType {
 // (set, get) => ({}) is createState callback of create, set and get is internal function of zustand
 const useChat = create<ChatType>((set, get) => ({
     chats: [],
-    chatHistory: localStorage.getItem("chatHistory")
-        ? JSON.parse(localStorage.getItem("chatHistory") as string)
-        : [],
+    chatHistory: [],
+    conversations: [],
+    currentConversation: "",
+
+    initChatHistory: async () => {
+        const response = await fetch(`${BASE_API_URL}/conversations`, {
+            headers: {
+               Authorization: `Bearer ${useAuth.getState().token}`,
+            }
+        });
+        const data = await response.json();
+        set({ chatHistory: data.map((c: any) => c.id) });
+        set({ conversations: data });
+    },
     addChat: (chat, index) => {
+        fetch(`${BASE_API_URL}/messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${useAuth.getState().token}`,
+            },
+            body: JSON.stringify({...chat, conversation_id: get().currentConversation}),
+        })
         set(
             produce((state: ChatType) => {
                 if (index || index === 0) state.chats[index] = chat;
@@ -145,9 +168,9 @@ const useChat = create<ChatType>((set, get) => ({
                 }
             })
         );
-        if (chat.role === "assistant" && chat.content) {
-            get().saveChats();
-        }
+        // if (chat.role === "bot" && chat.content) {
+        //     get().saveChats();
+        // }
     },
     editChatMessage: (chat, updateIndex) => {
         set(
@@ -165,47 +188,60 @@ const useChat = create<ChatType>((set, get) => ({
         );
     },
 
-    saveChats: () => {
+    saveChats: async () => { // no used
         let chat_id = get().chats[0].id;
-        let title;
-        if (localStorage.getItem(chat_id)) {
-            const data = JSON.parse(localStorage.getItem(chat_id) ?? "");
-            if (data.isTitleEdited) {
-                title = data.title;
-            }
+        const response = await fetch(`${BASE_API_URL}/chats`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${useAuth.getState().token}`,
+            },
+            body: JSON.stringify({
+                id: chat_id,
+                createdAt: new Date().toISOString(),
+                chats: get().chats,
+                title: get().chats[0].content,
+                isTitleEdited: false,
+                agentType: useSettings.getState().settings.selectedAgent,
+            }),
+        });
+        const data = await response.json();
+        if (response.status !== 201) {
+            console.error("Failed to save chat history", data);
+            return;
         }
-        const data = {
-            id: chat_id,
-            createdAt: new Date().toISOString(),
-            chats: get().chats,
-            title: title ? title : get().chats[0].content,
-            isTitleEdited: Boolean(title),
-            agentType: useSettings.getState().settings.selectedAgent,
-        };
-
-        localStorage.setItem(chat_id, JSON.stringify(data));
-        if (get().chatHistory.includes(chat_id)) return;
-        localStorage.setItem(
-            "chatHistory",
-            JSON.stringify([...get().chatHistory, chat_id])
-        );
+        const chatHistory = await fetch(`${BASE_API_URL}/chats`, {
+            headers: {
+                Authorization: `Bearer ${useAuth.getState().token}`,
+            },
+        });
+        const chatHistoryData = await chatHistory.json();
         set(
             produce((state: ChatType) => {
-                state.chatHistory.push(chat_id);
+                state.chatHistory = chatHistoryData;
             })
         );
     },
-    viewSelectedChat: (chatId) => {
+    viewSelectedChat: async (conversationId) => {
+        const response = await fetch(`${BASE_API_URL}/conversations/${conversationId}`, {
+            headers: {
+                Authorization: `Bearer ${useAuth.getState().token}`,
+            },
+        });
+        const data = await response.json();
+        if (response.status !== 200) {
+            console.error("Failed to get chat", data);
+            return;
+        }
         set(
             produce((state: ChatType) => {
-                if (!localStorage.getItem(chatId)) return;
-                const chatData = JSON.parse(localStorage.getItem(chatId) ?? "");
-                state.chats = chatData.chats ?? [];
+                state.chats = data.chats ?? [];
+                state.currentConversation = conversationId;
 
                 // Set the agent type for this chat
-                if (chatData.agentType) {
+                if (data.agentType) {
                     // Switch to the correct agent for this chat
-                    useSettings.getState().setAgent(chatData.agentType);
+                    useSettings.getState().setAgent(data.agentType);
                 }
             })
         );
@@ -217,37 +253,74 @@ const useChat = create<ChatType>((set, get) => ({
             })
         );
     },
-    handleDeleteChats: (chatid) => {
-        set(
-            produce((state: ChatType) => {
-                state.chatHistory = state.chatHistory.filter((id) => id !== chatid);
-                state.chats = [];
-                localStorage.removeItem(chatid);
-                localStorage.setItem("chatHistory", JSON.stringify(state.chatHistory));
-            })
-        );
+    handleDeleteChats: async (conversationId) => {
+        try {
+            const response = await fetch(`${BASE_API_URL}/conversations/${conversationId}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${useAuth.getState().token}`,
+                },
+            });
+
+            if (!response.ok) {
+                console.error("Failed to delete chat", await response.json());
+                return;
+            }
+
+            set(
+                produce((state: ChatType) => {
+                    state.chatHistory = state.chatHistory.filter((id) => id !== conversationId);
+                    state.chats = [];
+                    state.currentConversation = "";
+                })
+            );
+        } catch (error) {
+            console.error("Error deleting chat", error);
+        }
     },
-    editChatsTitle: (id, title) => {
-        set(
-            produce((state: ChatType) => {
-                const chat = JSON.parse(localStorage.getItem(id) ?? "");
-                chat.title = title;
-                chat.isTitleEdited = true;
-                localStorage.setItem(id, JSON.stringify(chat));
-            })
-        );
+    editChatsTitle: async (id, title) => {
+        try {
+            const response = await fetch(`${BASE_API_URL}/conversations/${id}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${useAuth.getState().token}`,
+                },
+                body: JSON.stringify({ title, isTitleEdited: true }),
+            });
+
+            if (!response.ok) {
+                console.error("Failed to edit chat title", await response.json());
+                return;
+            }
+        } catch (error) {
+            console.error("Error editing chat title", error);
+        }
     },
-    clearAllChats: () => {
-        set(
-            produce((state: ChatType) => {
-                state.chatHistory.forEach((id) => {
-                    localStorage.removeItem(id);
-                });
-                state.chats = [];
-                state.chatHistory = [];
-                localStorage.removeItem("chatHistory");
-            })
-        );
+    clearAllChats: async () => {
+        try {
+            const response = await fetch(`${BASE_API_URL}/conversations`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${useAuth.getState().token}`,
+                },
+            });
+
+            if (!response.ok) {
+                console.error("Failed to clear all chats", await response.json());
+                return;
+            }
+
+            set(
+                produce((state: ChatType) => {
+                    state.chats = [];
+                    state.chatHistory = [];
+                    state.currentConversation = "";
+                })
+            );
+        } catch (error) {
+            console.error("Error clearing all chats", error);
+        }
     },
 }));
 
@@ -453,11 +526,8 @@ export const priority = [
 export const selectChatsHistory = (state: ChatType) => {
     const sortedData: Record<string,
         { title: string; id: string; month: string; month_id: number, agentType: AgentList }[]> = {};
-    state.chatHistory.forEach((chat_id) => {
-        const {title, id, createdAt, agentType} = JSON.parse(
-            localStorage.getItem(chat_id) as string
-        );
-        const myDate = moment(createdAt, "YYYY-MM-DD");
+    state.conversations.forEach( ({title, id, created_at, agentType}) => {
+        const myDate = moment(created_at, "YYYY-MM-DD");
         const currentDate = moment();
         const month = myDate.toDate().getMonth();
 

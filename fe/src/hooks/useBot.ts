@@ -35,7 +35,7 @@ export default function useBot({ index, chat }: Props) {
 
   useEffect(() => {
     function addMessage() {
-      addChat(createMessage("assistant", resultRef.current, chat.type), index);
+      addChat(createMessage("bot", resultRef.current, chat.type), index);
       setIsStreamCompleted(true);
     }
 

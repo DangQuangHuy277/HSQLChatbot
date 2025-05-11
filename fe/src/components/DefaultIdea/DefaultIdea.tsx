@@ -25,7 +25,7 @@ export default function DefaultIdea({
           className="border inline-flex dark:border-gray-500 border-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 mb-2  w-full text-left p-2 group rounded-md  shadow flex-1 md:flex-row md:items-center"
           onClick={() => {
             addChat(createMessage("user", i.moreContext, "text"));
-            addChat(createMessage("assistant", "", "text"));
+            addChat(createMessage("bot", "", "text"));
           }}
         >
           <div className=" self-stretch w-11/12">

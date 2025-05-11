@@ -8,7 +8,7 @@ export default function Chats() {
   return (
     <div className="md:mt-10 w-full">
       {chats.map((chat, index) =>
-        chat.role === "assistant" ? (
+        chat.role === "bot" ? (
           <BotMessage index={index} key={chat.id} chat={chat} />
         ) : (
           <UserMessage chat={chat} chatIndex={index} key={chat.id} />
