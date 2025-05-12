@@ -29,7 +29,7 @@ export default function useImage(
       .then((image) => {
         setImage(image.data[0].url);
         addChat(
-          createMessage("assistant", image.data[0].url, "image_url"),
+          createMessage("bot", image.data[0].url, "image_url"),
           index
         );
       })

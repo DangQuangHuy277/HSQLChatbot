@@ -36,7 +36,7 @@ export default function UserQuery() {
       addChat(createMessage("user", query, "text"));
       addChat(
         createMessage(
-          "assistant",
+          "bot",
           "",
           selectedModal.startsWith("dall-e") ? "image_url" : "text"
         )

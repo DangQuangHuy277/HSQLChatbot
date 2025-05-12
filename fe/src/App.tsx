@@ -18,8 +18,15 @@ function App() {
   const [active, setActive] = useState(false);
   const isChatsVisible = useChat(chatsLength);
   const addNewChat = useChat((state) => state.addNewChat);
+  const initChatHistory = useChat((state) => state.initChatHistory);
   const loggedIn = useAuth((state) => state.accessToken !== "");
   const [theme] = useTheme((state) => [state.theme]);
+
+  useEffect(() => {
+    if (loggedIn) {
+      initChatHistory();
+    } 
+  },[loggedIn, initChatHistory])
 
   useEffect(() => {
     if (theme === "dark") {
@@ -28,6 +35,7 @@ function App() {
       document.documentElement.classList.remove("dark");
     }
   }, [theme]);
+
 
   return (
     <>
