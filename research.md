@@ -1,1 +1,0 @@
-https://www.cs.purdue.edu/homes/csjgwang/pubs/SIGMOD21_Milvus.pdf
